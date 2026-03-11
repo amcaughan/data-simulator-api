@@ -4,12 +4,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      deep_gitleaks:
-        description: "Scan full git history with gitleaks (slower)"
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: read
@@ -37,7 +31,7 @@ jobs:
       artifact_name: sarif-gitleaks
       sarif_filename: gitleaks.sarif
       redact: true
-      scan_history: ${{ github.event_name == 'pull_request' || inputs.deep_gitleaks }}
+      scan_history: ${{ github.event_name == 'pull_request' }}
 
   actionlint:
     uses: amcaughan/shared_workflows/.github/workflows/scan-actionlint.yml@a4a6c7f36d5d9d964e7af20e6867b2c175629c68
