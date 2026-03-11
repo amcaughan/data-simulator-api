@@ -18,6 +18,12 @@ Repository structure
 - `infra/terragrunt/live/` for deployable stacks
 - `docker/dev/` for the local development container
 
+Current MVP
+
+- Lambda deployed as a zip package
+- dependencies sourced from `app/requirements.txt`
+- package build performed by Terraform during apply
+
 Usage
 
 Infrastructure is applied manually via Terragrunt.
