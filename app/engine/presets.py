@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
-
 from app.api.models import PresetGenerateRequest, ScenarioGenerateRequest
 
 
@@ -37,7 +35,6 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
             "seed": request.seed,
             "row_count": row_count,
             "time": {
-                "start": datetime.now(timezone.utc),
                 "frequency_seconds": int(overrides.get("frequency_seconds", 300)),
             },
             "fields": [
@@ -122,7 +119,6 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
             "seed": request.seed,
             "row_count": row_count,
             "time": {
-                "start": datetime.now(timezone.utc),
                 "frequency_seconds": int(overrides.get("frequency_seconds", 60)),
             },
             "fields": [

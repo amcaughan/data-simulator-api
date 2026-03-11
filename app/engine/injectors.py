@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 
 from app.api.models import InjectorSpec, MutationSpec, OffsetMutationSpec, ScaleMutationSpec, SelectionSpec
+from app.engine.randomness import build_rng
 
 
 LABELS_KEY = "__labels"
@@ -201,7 +202,7 @@ def validate_stateless_injectors(injectors: Sequence[InjectorSpec]) -> None:
 def apply_injectors(
     rows: Sequence[dict[str, Any]],
     injectors: Sequence[InjectorSpec],
-    rng: np.random.Generator,
+    scenario_seed: int | None,
 ) -> None:
     for injector in injectors:
         _validate_field(rows, injector.field)
@@ -209,7 +210,9 @@ def apply_injectors(
         selection_behavior = SELECTION_BEHAVIORS[injector.selection.kind]
         mutation_behavior = MUTATION_BEHAVIORS[injector.mutation.kind]
 
-        indexes = selection_behavior.select_indexes(len(rows), injector.selection, rng)
+        selection_rng = build_rng(scenario_seed, "injector", injector.injector_id, "selection")
+        indexes = selection_behavior.select_indexes(len(rows), injector.selection, selection_rng)
         for index in indexes:
-            mutation_result = mutation_behavior.apply(rows[index], injector.field, injector.mutation, rng)
+            mutation_rng = build_rng(scenario_seed, "injector", injector.injector_id, "mutation", index)
+            mutation_result = mutation_behavior.apply(rows[index], injector.field, injector.mutation, mutation_rng)
             _tag_row(rows[index], injector, mutation_result)

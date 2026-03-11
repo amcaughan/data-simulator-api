@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -15,10 +15,6 @@ DistributionName = Literal[
     "poisson",
     "uniform",
 ]
-
-
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class DistributionRequestBase(BaseModel):
@@ -43,7 +39,7 @@ class DistributionGenerateRequest(DistributionRequestBase):
 class TimeSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    start: datetime = Field(default_factory=utc_now)
+    start: datetime | None = None
     frequency_seconds: int = Field(default=60, ge=1)
 
 
