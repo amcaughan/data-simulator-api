@@ -21,7 +21,8 @@ Repository structure
 Current MVP
 
 - Lambda deployed as a zip package
-- dependencies sourced from `app/requirements.txt`
+- direct dependencies declared in `app/requirements.in`
+- deployable dependency lockfile compiled to `app/requirements.txt`
 - package build performed by Terraform during apply
 
 Usage

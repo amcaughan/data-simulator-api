@@ -1,1 +1,2 @@
-# Runtime dependencies for the Lambda package and local dev container.
+# Compiled runtime dependency lockfile.
+# Generate with pip-compile app/requirements.in --output-file app/requirements.txt
