@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 DistributionName = Literal[
@@ -123,14 +123,52 @@ class OffsetMutationSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["offset"]
-    amount: float
+    amount: float | None = None
+    min_amount: float | None = None
+    max_amount: float | None = None
+
+    @model_validator(mode="after")
+    def validate_amount_config(self) -> OffsetMutationSpec:
+        has_fixed_amount = self.amount is not None
+        has_any_range = self.min_amount is not None or self.max_amount is not None
+
+        if has_fixed_amount and has_any_range:
+            raise ValueError("offset mutations must use either amount or min_amount/max_amount")
+
+        if has_fixed_amount:
+            return self
+
+        if self.min_amount is None or self.max_amount is None:
+            raise ValueError("offset range mutations require both min_amount and max_amount")
+        if self.max_amount < self.min_amount:
+            raise ValueError("offset range mutations require max_amount >= min_amount")
+        return self
 
 
 class ScaleMutationSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["scale"]
-    factor: float
+    factor: float | None = Field(default=None, gt=0.0)
+    min_factor: float | None = Field(default=None, gt=0.0)
+    max_factor: float | None = Field(default=None, gt=0.0)
+
+    @model_validator(mode="after")
+    def validate_factor_config(self) -> ScaleMutationSpec:
+        has_fixed_factor = self.factor is not None
+        has_any_range = self.min_factor is not None or self.max_factor is not None
+
+        if has_fixed_factor and has_any_range:
+            raise ValueError("scale mutations must use either factor or min_factor/max_factor")
+
+        if has_fixed_factor:
+            return self
+
+        if self.min_factor is None or self.max_factor is None:
+            raise ValueError("scale range mutations require both min_factor and max_factor")
+        if self.max_factor < self.min_factor:
+            raise ValueError("scale range mutations require max_factor >= min_factor")
+        return self
 
 
 class SetValueMutationSpec(BaseModel):

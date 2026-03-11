@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from app.api.models import InjectorSpec, MutationSpec, SelectionSpec
+from app.api.models import InjectorSpec, MutationSpec, OffsetMutationSpec, ScaleMutationSpec, SelectionSpec
 
 
 LABELS_KEY = "__labels"
@@ -22,7 +22,7 @@ class SelectionBehavior:
 @dataclass(frozen=True)
 class MutationBehavior:
     stateless: bool
-    apply: Callable[[Sequence[dict[str, Any]], Sequence[int], str, MutationSpec], None]
+    apply: Callable[[dict[str, Any], str, MutationSpec, np.random.Generator], dict[str, Any]]
 
 
 def initialize_labels(rows: Sequence[dict[str, Any]]) -> None:
@@ -49,7 +49,7 @@ def summarize_labels(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _tag_row(row: dict[str, Any], injector: InjectorSpec) -> None:
+def _tag_row(row: dict[str, Any], injector: InjectorSpec, mutation_result: dict[str, Any]) -> None:
     row[IS_ANOMALY_KEY] = True
     row[LABELS_KEY].append(
         {
@@ -58,6 +58,9 @@ def _tag_row(row: dict[str, Any], injector: InjectorSpec) -> None:
             "field": injector.field,
             "selection_kind": injector.selection.kind,
             "severity": injector.severity,
+            "original_value": mutation_result["original_value"],
+            "mutated_value": mutation_result["mutated_value"],
+            "applied_mutation": mutation_result["applied_mutation"],
         }
     )
 
@@ -88,34 +91,82 @@ def _select_rate(row_count: int, selection: SelectionSpec, rng: np.random.Genera
 
 
 def _select_count(row_count: int, selection: SelectionSpec, rng: np.random.Generator) -> list[int]:
-    actual_count = min(selection.count, row_count)
-    if actual_count <= 0:
-        return []
-    return sorted(rng.choice(row_count, size=actual_count, replace=False).tolist())
+    if selection.count > row_count:
+        raise ValueError(f"count selection requires count <= row_count; got count={selection.count}, row_count={row_count}")
+    return sorted(rng.choice(row_count, size=selection.count, replace=False).tolist())
 
 
-def _apply_offset(rows: Sequence[dict[str, Any]], indexes: Sequence[int], field: str, mutation: MutationSpec) -> None:
-    for index in indexes:
-        rows[index][field] = rows[index][field] + mutation.amount
+def _resolve_offset_amount(mutation: OffsetMutationSpec, rng: np.random.Generator) -> float:
+    if mutation.amount is not None:
+        return mutation.amount
+    return float(rng.uniform(mutation.min_amount, mutation.max_amount))
 
 
-def _apply_scale(rows: Sequence[dict[str, Any]], indexes: Sequence[int], field: str, mutation: MutationSpec) -> None:
-    for index in indexes:
-        rows[index][field] = rows[index][field] * mutation.factor
+def _resolve_scale_factor(mutation: ScaleMutationSpec, rng: np.random.Generator) -> float:
+    if mutation.factor is not None:
+        return mutation.factor
+    return float(rng.uniform(mutation.min_factor, mutation.max_factor))
 
 
-def _apply_set_value(rows: Sequence[dict[str, Any]], indexes: Sequence[int], field: str, mutation: MutationSpec) -> None:
-    for index in indexes:
-        rows[index][field] = mutation.value
+def _apply_offset(row: dict[str, Any], field: str, mutation: MutationSpec, rng: np.random.Generator) -> dict[str, Any]:
+    original_value = row[field]
+    amount = _resolve_offset_amount(mutation, rng)
+    mutated_value = original_value + amount
+    row[field] = mutated_value
+    return {
+        "original_value": original_value,
+        "mutated_value": mutated_value,
+        "applied_mutation": {
+            "kind": mutation.kind,
+            "amount": amount,
+        },
+    }
 
 
-def _apply_set_missing(rows: Sequence[dict[str, Any]], indexes: Sequence[int], field: str, mutation: MutationSpec) -> None:
-    for index in indexes:
-        rows[index][field] = None
+def _apply_scale(row: dict[str, Any], field: str, mutation: MutationSpec, rng: np.random.Generator) -> dict[str, Any]:
+    original_value = row[field]
+    factor = _resolve_scale_factor(mutation, rng)
+    mutated_value = original_value * factor
+    row[field] = mutated_value
+    return {
+        "original_value": original_value,
+        "mutated_value": mutated_value,
+        "applied_mutation": {
+            "kind": mutation.kind,
+            "factor": factor,
+            "percent_change": factor - 1.0,
+        },
+    }
+
+
+def _apply_set_value(row: dict[str, Any], field: str, mutation: MutationSpec, rng: np.random.Generator) -> dict[str, Any]:
+    original_value = row[field]
+    mutated_value = mutation.value
+    row[field] = mutated_value
+    return {
+        "original_value": original_value,
+        "mutated_value": mutated_value,
+        "applied_mutation": {
+            "kind": mutation.kind,
+            "value": mutation.value,
+        },
+    }
+
+
+def _apply_set_missing(row: dict[str, Any], field: str, mutation: MutationSpec, rng: np.random.Generator) -> dict[str, Any]:
+    original_value = row[field]
+    row[field] = None
+    return {
+        "original_value": original_value,
+        "mutated_value": None,
+        "applied_mutation": {
+            "kind": mutation.kind,
+        },
+    }
 
 
 SELECTION_BEHAVIORS: dict[str, SelectionBehavior] = {
-    "count": SelectionBehavior(stateless=False, select_indexes=_select_count),
+    "count": SelectionBehavior(stateless=True, select_indexes=_select_count),
     "index": SelectionBehavior(stateless=False, select_indexes=_select_index),
     "rate": SelectionBehavior(stateless=True, select_indexes=_select_rate),
     "window": SelectionBehavior(stateless=False, select_indexes=_select_window),
@@ -159,7 +210,6 @@ def apply_injectors(
         mutation_behavior = MUTATION_BEHAVIORS[injector.mutation.kind]
 
         indexes = selection_behavior.select_indexes(len(rows), injector.selection, rng)
-        mutation_behavior.apply(rows, indexes, injector.field, injector.mutation)
-
         for index in indexes:
-            _tag_row(rows[index], injector)
+            mutation_result = mutation_behavior.apply(rows[index], injector.field, injector.mutation, rng)
+            _tag_row(rows[index], injector, mutation_result)
