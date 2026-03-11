@@ -27,7 +27,7 @@ variable "function_name" {
 
 variable "handler" {
   type    = string
-  default = "handler.handler"
+  default = "app.handler.handler"
 }
 
 variable "log_retention_in_days" {
