@@ -7,5 +7,15 @@ terraform {
 }
 
 inputs = {
-  environment = "prod"
+  app_dir                          = "${get_repo_root()}/app"
+  description                      = "Production Lambda for the data simulator API"
+  environment                      = "prod"
+  function_name                    = "data-simulator-api-prod"
+  log_retention_in_days            = 30
+  memory_size_mb                   = 256
+  reserved_concurrent_executions   = 2
+  timeout_seconds                  = 5
+  environment_variables = {
+    LOG_LEVEL = "INFO"
+  }
 }

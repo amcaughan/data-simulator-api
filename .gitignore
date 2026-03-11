@@ -7,8 +7,10 @@ crash.log
 *.tfplan
 dist/
 build/
+.lambda-build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 __pycache__/
 *.pyc
+.venv/

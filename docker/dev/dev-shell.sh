@@ -41,7 +41,7 @@ run() {
     -w /workspace \
     -v "$HOME/.aws:/home/dev/.aws:rw" \
     "$IMAGE_NAME" \
-    /bin/bash
+    /bin/bash -lc 'if [[ -f /workspace/app/requirements.txt ]] && [[ -s /workspace/app/requirements.txt ]]; then python3 -m pip install --user -r /workspace/app/requirements.txt; fi; exec /bin/bash'
 }
 
 if [[ $# -eq 0 ]]; then

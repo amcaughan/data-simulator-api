@@ -1,0 +1,2 @@
+# Direct runtime dependencies for the Lambda package and local dev container.
+numpy==2.2.6

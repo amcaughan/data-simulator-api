@@ -1,2 +1,8 @@
 skip-check:
   - CKV_GHA_7 # workflow_dispatch input is intentional for optional deep gitleaks scans
+  - CKV_AWS_338 # 1-year log retention is unnecessary for a small personal project
+  - CKV_AWS_158 # CloudWatch KMS CMK is not worth the extra key management here
+  - CKV_AWS_50 # X-Ray is optional and not needed for the Lambda MVP
+  - CKV_AWS_117 # Lambda does not need VPC placement for this account-private MVP
+  - CKV_AWS_272 # Lambda code signing adds complexity without meaningful value here
+  - CKV_AWS_173 # Default Lambda env var encryption is sufficient for this repo
