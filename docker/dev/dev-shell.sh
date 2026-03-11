@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE_NAME="data-simulator-api-dev"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+DOCKERFILE="$REPO_ROOT/docker/dev/Dockerfile"
+
+usage() {
+  cat <<EOF
+Usage: $0 <command>
+
+Commands:
+  build      Build the dev image
+  rebuild    Rebuild the dev image (no cache)
+  run        Start an interactive shell
+  destroy    Remove the dev image
+  help       Show this message
+EOF
+}
+
+build() {
+  docker build -f "$DOCKERFILE" -t "$IMAGE_NAME" "$REPO_ROOT"
+}
+
+rebuild() {
+  docker build --no-cache -f "$DOCKERFILE" -t "$IMAGE_NAME" "$REPO_ROOT"
+}
+
+destroy() {
+  docker rmi -f "$IMAGE_NAME"
+}
+
+run() {
+  if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+    build
+  fi
+
+  docker run --rm -it \
+    -v "$REPO_ROOT:/workspace" \
+    -w /workspace \
+    -v "$HOME/.aws:/home/dev/.aws:rw" \
+    "$IMAGE_NAME" \
+    /bin/bash
+}
+
+if [[ $# -eq 0 ]]; then
+  run
+  exit 0
+fi
+
+cmd="$1"
+shift || true
+
+case "$cmd" in
+  build) build ;;
+  rebuild) rebuild ;;
+  run) run ;;
+  destroy) destroy ;;
+  help|-h|--help) usage ;;
+  *) usage; exit 1 ;;
+esac
