@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from app.api.models import PresetPreviewRequest, ScenarioPreviewRequest
+from app.api.models import PresetGenerateRequest, ScenarioGenerateRequest
 
 
 def list_presets() -> list[dict[str, str]]:
@@ -21,13 +21,13 @@ def list_presets() -> list[dict[str, str]]:
     ]
 
 
-def _build_transaction_preset(request: PresetPreviewRequest) -> ScenarioPreviewRequest:
+def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerateRequest:
     overrides = request.overrides
     row_count = request.row_count
     anomaly_index = int(overrides.get("anomaly_index", max(1, row_count // 5)))
     regime_start = int(overrides.get("regime_start_index", max(1, row_count // 2)))
 
-    return ScenarioPreviewRequest.model_validate(
+    return ScenarioGenerateRequest.model_validate(
         {
             "schema_version": "1.0",
             "name": "transaction_benchmark",
@@ -95,13 +95,13 @@ def _build_transaction_preset(request: PresetPreviewRequest) -> ScenarioPreviewR
     )
 
 
-def _build_iot_sensor_preset(request: PresetPreviewRequest) -> ScenarioPreviewRequest:
+def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerateRequest:
     overrides = request.overrides
     row_count = request.row_count
     missing_start = int(overrides.get("missing_start_index", max(1, row_count // 3)))
     stuck_start = int(overrides.get("stuck_start_index", max(1, row_count // 2)))
 
-    return ScenarioPreviewRequest.model_validate(
+    return ScenarioGenerateRequest.model_validate(
         {
             "schema_version": "1.0",
             "name": "iot_sensor_benchmark",
@@ -163,7 +163,7 @@ def _build_iot_sensor_preset(request: PresetPreviewRequest) -> ScenarioPreviewRe
     )
 
 
-def build_preset_preview(preset_id: str, request: PresetPreviewRequest) -> ScenarioPreviewRequest:
+def build_preset_generate_request(preset_id: str, request: PresetGenerateRequest) -> ScenarioGenerateRequest:
     builders: dict[str, Any] = {
         "iot_sensor_benchmark": _build_iot_sensor_preset,
         "transaction_benchmark": _build_transaction_preset,

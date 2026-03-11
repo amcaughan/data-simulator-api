@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from app.api.models import FieldSpec, ScenarioPreviewRequest
+from app.api.models import FieldSpec, ScenarioGenerateRequest
 from app.engine.distributions import sample_distribution
 from app.engine.injectors import apply_injectors, initialize_labels, summarize_labels
 
@@ -39,7 +39,7 @@ def _generate_field_values(field: FieldSpec, row_count: int, rng: np.random.Gene
     raise ValueError(f"unsupported generator kind: {generator.kind}")
 
 
-def _build_rows(request: ScenarioPreviewRequest) -> list[dict[str, Any]]:
+def _build_rows(request: ScenarioGenerateRequest) -> list[dict[str, Any]]:
     rng = np.random.default_rng(request.seed)
     rows = [
         {
@@ -59,7 +59,7 @@ def _build_rows(request: ScenarioPreviewRequest) -> list[dict[str, Any]]:
     return rows
 
 
-def preview_scenario(request: ScenarioPreviewRequest) -> dict[str, Any]:
+def generate_scenario(request: ScenarioGenerateRequest) -> dict[str, Any]:
     rows = _build_rows(request)
 
     return {

@@ -139,7 +139,7 @@ InjectorSpec = Annotated[
 ]
 
 
-class ScenarioPreviewRequest(BaseModel):
+class ScenarioGenerateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = "1.0"
@@ -152,7 +152,7 @@ class ScenarioPreviewRequest(BaseModel):
     injectors: list[InjectorSpec] = Field(default_factory=list)
 
 
-class PresetPreviewRequest(BaseModel):
+class PresetGenerateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     seed: int | None = None

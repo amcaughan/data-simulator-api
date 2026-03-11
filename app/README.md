@@ -13,7 +13,7 @@ This package contains the Lambda application code for the data simulator API.
 - `engine/distributions.py`
   primitive distribution sampling and summaries
 - `engine/scenario.py`
-  scenario preview generation
+  scenario generation
 - `engine/injectors.py`
   anomaly and benchmark injection logic
 - `engine/presets.py`
@@ -27,9 +27,9 @@ This package contains the Lambda application code for the data simulator API.
 
 - `/health`
 - `/v1/distributions/sample`
-- `/v1/scenarios/preview`
+- `/v1/scenarios/generate`
 - `/v1/presets`
-- `/v1/presets/{preset_id}/preview`
+- `/v1/presets/{preset_id}/generate`
 
 ## Sample Requests
 
@@ -57,12 +57,12 @@ This package contains the Lambda application code for the data simulator API.
 }
 ```
 
-### Scenario Preview
+### Scenario Generate
 
 ```json
 {
-  "action": "/v1/scenarios/preview",
-  "name": "simple_preview",
+  "action": "/v1/scenarios/generate",
+  "name": "simple_generate",
   "seed": 11,
   "row_count": 6,
   "time": {
@@ -109,11 +109,11 @@ This package contains the Lambda application code for the data simulator API.
 }
 ```
 
-### Preset Preview
+### Preset Generate
 
 ```json
 {
-  "action": "/v1/presets/preview",
+  "action": "/v1/presets/generate",
   "preset_id": "transaction_benchmark",
   "seed": 3,
   "row_count": 12,

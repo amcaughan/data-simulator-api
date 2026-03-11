@@ -7,10 +7,10 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.api.models import DistributionSampleRequest, PresetPreviewRequest, ScenarioPreviewRequest
+from app.api.models import DistributionSampleRequest, PresetGenerateRequest, ScenarioGenerateRequest
 from app.engine.distributions import build_distribution_response
-from app.engine.presets import build_preset_preview, list_presets
-from app.engine.scenario import preview_scenario
+from app.engine.presets import build_preset_generate_request, list_presets
+from app.engine.scenario import generate_scenario
 
 
 def json_response(status_code: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -44,7 +44,7 @@ def _extract_preset_id(route: str, event: dict[str, Any], payload: dict[str, Any
         return payload["preset_id"]
 
     parts = [part for part in route.split("/") if part]
-    if len(parts) >= 4 and parts[0] == "v1" and parts[1] == "presets" and parts[3] == "preview":
+    if len(parts) >= 4 and parts[0] == "v1" and parts[1] == "presets" and parts[3] == "generate":
         return parts[2]
 
     return None
@@ -70,22 +70,22 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any]:
             request = DistributionSampleRequest.model_validate(payload)
             return json_response(200, build_distribution_response(request))
 
-        if route == "/v1/scenarios/preview":
-            request = ScenarioPreviewRequest.model_validate(payload)
-            return json_response(200, preview_scenario(request))
+        if route == "/v1/scenarios/generate":
+            request = ScenarioGenerateRequest.model_validate(payload)
+            return json_response(200, generate_scenario(request))
 
         if route == "/v1/presets":
             return json_response(200, {"presets": list_presets()})
 
-        if route == "/v1/presets/preview" or route.endswith("/preview"):
+        if route == "/v1/presets/generate" or route.endswith("/generate"):
             preset_id = _extract_preset_id(route, event, payload)
             if not preset_id:
-                raise ValueError("preset preview requires a preset_id")
+                raise ValueError("preset generate requires a preset_id")
 
             request_payload = {key: value for key, value in payload.items() if key != "preset_id"}
-            request = PresetPreviewRequest.model_validate(request_payload)
-            scenario_request = build_preset_preview(preset_id, request)
-            return json_response(200, preview_scenario(scenario_request))
+            request = PresetGenerateRequest.model_validate(request_payload)
+            scenario_request = build_preset_generate_request(preset_id, request)
+            return json_response(200, generate_scenario(scenario_request))
 
     except ValidationError as exc:
         return json_response(400, {"error": "validation_error", "details": json.loads(exc.json())})
