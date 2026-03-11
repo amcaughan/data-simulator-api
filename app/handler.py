@@ -2,6 +2,8 @@ import json
 import os
 from datetime import datetime, timezone
 
+import numpy as np
+
 
 def _json_response(status_code: int, payload: dict) -> dict:
     return {
@@ -28,13 +30,22 @@ def handler(event, context):
         )
 
     if route in ("/simulate", "simulate"):
+        mean = float(event.get("mean", 0.0))
+        stddev = float(event.get("stddev", 1.0))
+        seed = event.get("seed")
+
+        rng = np.random.default_rng(seed)
+        sample = float(rng.normal(loc=mean, scale=stddev))
+
         return _json_response(
             200,
             {
                 "status": "ok",
-                "series": [0.1, 0.5, 0.9],
-                "count": 3,
-                "note": "dummy payload",
+                "distribution": "normal",
+                "mean": mean,
+                "stddev": stddev,
+                "seed": seed,
+                "sample": sample,
             },
         )
 
