@@ -1,3 +1,4 @@
 # Compiled runtime dependency lockfile.
 # Generate with pip-compile app/requirements.in --output-file app/requirements.txt
 numpy==2.2.6
+pydantic==2.11.9
