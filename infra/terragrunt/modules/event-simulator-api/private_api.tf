@@ -96,25 +96,25 @@ resource "aws_api_gateway_stage" "private" {
   stage_name    = local.private_api_stage_name
 
   method_settings {
-    method_path       = "*/*"
-    logging_level     = "ERROR"
-    metrics_enabled   = true
+    method_path        = "*/*"
+    logging_level      = "ERROR"
+    metrics_enabled    = true
     data_trace_enabled = false
   }
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.private_api_access.arn
     format = jsonencode({
-      requestId              = "$context.requestId"
-      sourceIp               = "$context.identity.sourceIp"
-      requestTime            = "$context.requestTime"
-      httpMethod             = "$context.httpMethod"
-      path                   = "$context.path"
-      status                 = "$context.status"
-      responseLength         = "$context.responseLength"
-      integrationError       = "$context.integrationErrorMessage"
-      apiId                  = "$context.apiId"
-      stage                  = "$context.stage"
+      requestId        = "$context.requestId"
+      sourceIp         = "$context.identity.sourceIp"
+      requestTime      = "$context.requestTime"
+      httpMethod       = "$context.httpMethod"
+      path             = "$context.path"
+      status           = "$context.status"
+      responseLength   = "$context.responseLength"
+      integrationError = "$context.integrationErrorMessage"
+      apiId            = "$context.apiId"
+      stage            = "$context.stage"
     })
   }
 
