@@ -6,12 +6,6 @@ data "aws_ssm_parameter" "private_api_allowed_vpc" {
   name = var.private_api_allowed_vpc_ssm_param_name
 }
 
-data "aws_ssm_parameter" "private_api_execute_api_vpce" {
-  count = var.private_api_enabled ? 1 : 0
-
-  name = var.private_api_execute_api_vpce_ssm_param_name
-}
-
 locals {
   private_api_stage_name = coalesce(var.private_api_stage_name, var.environment)
 }
@@ -54,8 +48,7 @@ resource "aws_api_gateway_rest_api" "private" {
   policy      = data.aws_iam_policy_document.private_api_policy[0].json
 
   endpoint_configuration {
-    types            = ["PRIVATE"]
-    vpc_endpoint_ids = [data.aws_ssm_parameter.private_api_execute_api_vpce[0].value]
+    types = ["PRIVATE"]
   }
 }
 

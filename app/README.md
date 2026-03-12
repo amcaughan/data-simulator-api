@@ -221,9 +221,13 @@ Pass a different function name if needed:
 
 ## Private API Deployment
 
-The `dev` infrastructure stack can also create a private REST API Gateway in front of the Lambda. It reads the shared VPC and `execute-api` endpoint identifiers from SSM Parameter Store entries created by `aws_infra`.
+The `dev` stack can also create a private REST API Gateway in front of the Lambda.
+That API is scoped to the shared dev VPC published by `aws_infra`, but it is not tied
+to a specific `execute-api` VPC endpoint ID. Recreating the endpoint layer should not
+require reapplying this repo as long as the shared VPC stays the same.
 
-The resulting invoke URL is only reachable from inside the shared dev VPC through the configured interface endpoint.
+If a stable internal DNS name is added later, it should live with the shared endpoint
+stack in `aws_infra` so the name goes away when the endpoint layer is torn down.
 
 ## Design Notes
 
