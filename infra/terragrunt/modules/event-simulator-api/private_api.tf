@@ -112,6 +112,14 @@ resource "aws_api_gateway_stage" "private" {
   ]
 }
 
+resource "aws_ssm_parameter" "private_api_invoke_url" {
+  count = var.private_api_url_ssm_param_name != null ? 1 : 0
+
+  name  = var.private_api_url_ssm_param_name
+  type  = "String"
+  value = "https://${aws_api_gateway_rest_api.private.id}.execute-api.${data.aws_region.current.region}.amazonaws.com/${aws_api_gateway_stage.private.stage_name}"
+}
+
 resource "aws_lambda_permission" "private_api_gateway" {
   statement_id  = "AllowPrivateApiGatewayInvoke"
   action        = "lambda:InvokeFunction"

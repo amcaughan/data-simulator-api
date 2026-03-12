@@ -64,6 +64,11 @@ variable "private_api_log_retention_in_days" {
   default = 14
 }
 
+variable "private_api_url_ssm_param_name" {
+  type    = string
+  default = null
+}
+
 variable "private_api_stage_name" {
   type    = string
   default = null

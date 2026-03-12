@@ -15,6 +15,7 @@ inputs = {
   memory_size_mb                   = 256
   private_api_allowed_vpc_ssm_param_name = "/network/dev/vpc/vpc_id"
   private_api_stage_name                 = "prod"
+  private_api_url_ssm_param_name         = "/services/data-simulator-api/prod/private_api_invoke_url"
   reserved_concurrent_executions   = 2
   timeout_seconds                  = 5
   environment_variables = {
