@@ -54,3 +54,22 @@ variable "timeout_seconds" {
   type    = number
   default = 5
 }
+
+variable "private_api_allowed_vpc_ssm_param_name" {
+  type = string
+}
+
+variable "private_api_log_retention_in_days" {
+  type    = number
+  default = 14
+}
+
+variable "private_api_url_ssm_param_name" {
+  type    = string
+  default = null
+}
+
+variable "private_api_stage_name" {
+  type    = string
+  default = null
+}

@@ -7,3 +7,5 @@ skip-check:
   - CKV_AWS_272 # Lambda code signing adds complexity without meaningful value here
   - CKV_AWS_173 # Default Lambda env var encryption is sufficient for this repo
   - CKV2_AWS_73 # The DLQ already uses AWS-managed SQS encryption; a CMK is not worth the extra key management here
+  - CKV_AWS_73 # API Gateway X-Ray tracing is optional and not needed for this private MVP
+  - CKV2_AWS_29 # A WAF is unnecessary for a VPC-only private API Gateway

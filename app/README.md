@@ -219,6 +219,13 @@ Pass a different function name if needed:
 ./scripts/smoke_test_lambda.sh data-simulator-api-prod
 ```
 
+## Private API Deployment
+
+The `dev` stack can also create a private REST API Gateway in front of the Lambda.
+That API is scoped to the shared dev VPC published by `aws_infra`, but it is not tied
+to a specific `execute-api` VPC endpoint ID. Recreating the endpoint layer should not
+require reapplying this repo as long as the shared VPC stays the same.
+
 ## Design Notes
 
 - `handler.py` should stay thin.
