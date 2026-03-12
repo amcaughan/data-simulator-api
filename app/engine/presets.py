@@ -51,9 +51,6 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
             "description": "Transaction-like events with benchmark anomalies.",
             "seed": request.seed,
             "row_count": row_count,
-            "time": {
-                "frequency_seconds": int(overrides.get("frequency_seconds", 300)),
-            },
             "entity_pools": [
                 {
                     "name": "cards",
@@ -307,9 +304,6 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
             "description": "Sensor-like telemetry with quality and regime anomalies.",
             "seed": request.seed,
             "row_count": row_count,
-            "time": {
-                "frequency_seconds": int(overrides.get("frequency_seconds", 60)),
-            },
             "entity_pools": [
                 {
                     "name": "devices",
@@ -507,9 +501,6 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
             "description": "Order-like events with customer and product dimensions.",
             "seed": request.seed,
             "row_count": row_count,
-            "time": {
-                "frequency_seconds": int(overrides.get("frequency_seconds", 900)),
-            },
             "entity_pools": [
                 {
                     "name": "customers",
