@@ -76,6 +76,14 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                                 "weights": [0.7, 0.2, 0.1],
                             },
                         },
+                        {
+                            "name": "spend_bias",
+                            "generator": {
+                                "kind": "distribution",
+                                "distribution": "normal",
+                                "parameters": {"mean": 0.0, "stddev": 0.18},
+                            },
+                        },
                     ],
                 },
                 {
@@ -105,6 +113,14 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                                 "kind": "categorical",
                                 "values": ["low", "medium", "high"],
                                 "weights": [0.65, 0.25, 0.1],
+                            },
+                        },
+                        {
+                            "name": "ticket_size_bias",
+                            "generator": {
+                                "kind": "distribution",
+                                "distribution": "normal",
+                                "parameters": {"mean": 0.0, "stddev": 0.14},
                             },
                         },
                     ],
@@ -168,12 +184,38 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                 {
                     "name": "amount",
                     "generator": {
-                        "kind": "distribution",
+                        "kind": "contextual_distribution",
                         "distribution": "lognormal",
                         "parameters": {
                             "mean": float(overrides.get("amount_log_mean", 4.0)),
                             "stddev": float(overrides.get("amount_stddev", 0.35)),
                         },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "entity_name": "cards",
+                                "entity_attribute": "spend_bias",
+                            },
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "entity_name": "merchants",
+                                "entity_attribute": "ticket_size_bias",
+                            },
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": float(overrides.get("premium_segment_amount_shift", 0.22)),
+                                "when": [{"field": "card_segment", "equals": "premium"}],
+                            },
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": float(overrides.get("high_risk_amount_shift", 0.18)),
+                                "when": [{"field": "merchant_risk_tier", "equals": "high"}],
+                            },
+                        ],
                     },
                 },
                 {
@@ -187,9 +229,29 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                 {
                     "name": "is_declined",
                     "generator": {
-                        "kind": "distribution",
+                        "kind": "contextual_distribution",
                         "distribution": "bernoulli",
                         "parameters": {"probability": float(overrides.get("decline_probability", 0.04))},
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "probability",
+                                "operation": "multiply",
+                                "value": float(overrides.get("online_decline_multiplier", 1.6)),
+                                "when": [{"field": "channel", "equals": "online"}],
+                            },
+                            {
+                                "parameter": "probability",
+                                "operation": "multiply",
+                                "value": float(overrides.get("high_risk_decline_multiplier", 2.0)),
+                                "when": [{"field": "merchant_risk_tier", "equals": "high"}],
+                            },
+                            {
+                                "parameter": "probability",
+                                "operation": "multiply",
+                                "value": float(overrides.get("premium_decline_multiplier", 0.8)),
+                                "when": [{"field": "card_segment", "equals": "premium"}],
+                            },
+                        ],
                     },
                 },
             ],
@@ -197,6 +259,12 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                 {
                     "injector_id": "amount_spike",
                     "field": "amount",
+                    "scope": [
+                        {
+                            "field": "merchant_risk_tier",
+                            "equals": "high",
+                        }
+                    ],
                     "selection": {
                         "kind": "rate",
                         "rate": float(overrides.get("anomaly_rate", 0.03)),
@@ -263,6 +331,30 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
                                 "weights": [0.35, 0.25, 0.4],
                             },
                         },
+                        {
+                            "name": "temperature_offset",
+                            "generator": {
+                                "kind": "distribution",
+                                "distribution": "normal",
+                                "parameters": {"mean": 0.0, "stddev": 0.45},
+                            },
+                        },
+                        {
+                            "name": "pressure_offset",
+                            "generator": {
+                                "kind": "distribution",
+                                "distribution": "normal",
+                                "parameters": {"mean": 0.0, "stddev": 0.08},
+                            },
+                        },
+                        {
+                            "name": "noise_multiplier",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": [0.8, 1.0, 1.25],
+                                "weights": [0.2, 0.55, 0.25],
+                            },
+                        },
                     ],
                 }
             ],
@@ -293,23 +385,57 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
                 {
                     "name": "temperature_c",
                     "generator": {
-                        "kind": "distribution",
+                        "kind": "contextual_distribution",
                         "distribution": "normal",
                         "parameters": {
                             "mean": float(overrides.get("temperature_mean", 22.0)),
                             "stddev": float(overrides.get("temperature_stddev", 0.6)),
                         },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "entity_name": "devices",
+                                "entity_attribute": "temperature_offset",
+                            },
+                            {
+                                "parameter": "stddev",
+                                "operation": "multiply",
+                                "entity_name": "devices",
+                                "entity_attribute": "noise_multiplier",
+                            },
+                            {
+                                "parameter": "stddev",
+                                "operation": "multiply",
+                                "value": float(overrides.get("combo_sensor_noise_multiplier", 1.15)),
+                                "when": [{"field": "device_type", "equals": "combo_sensor"}],
+                            },
+                        ],
                     },
                 },
                 {
                     "name": "pressure_kpa",
                     "generator": {
-                        "kind": "distribution",
+                        "kind": "contextual_distribution",
                         "distribution": "normal",
                         "parameters": {
                             "mean": float(overrides.get("pressure_mean", 101.3)),
                             "stddev": float(overrides.get("pressure_stddev", 0.15)),
                         },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "entity_name": "devices",
+                                "entity_attribute": "pressure_offset",
+                            },
+                            {
+                                "parameter": "stddev",
+                                "operation": "multiply",
+                                "entity_name": "devices",
+                                "entity_attribute": "noise_multiplier",
+                            },
+                        ],
                     },
                 },
                 {
@@ -324,6 +450,12 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
                 {
                     "injector_id": "sensor_dropout",
                     "field": "pressure_kpa",
+                    "scope": [
+                        {
+                            "field": "device_type",
+                            "equals": "pressure_sensor",
+                        }
+                    ],
                     "selection": {
                         "kind": "window",
                         "start_index": missing_start,
@@ -336,6 +468,12 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
                 {
                     "injector_id": "sensor_stuck",
                     "field": "temperature_c",
+                    "scope": [
+                        {
+                            "field": "device_type",
+                            "equals": "thermometer",
+                        }
+                    ],
                     "selection": {
                         "kind": "window",
                         "start_index": stuck_start,
@@ -394,6 +532,14 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
                                 "weights": [0.65, 0.23, 0.12],
                             },
                         },
+                        {
+                            "name": "customer_spend_bias",
+                            "generator": {
+                                "kind": "distribution",
+                                "distribution": "normal",
+                                "parameters": {"mean": 0.0, "stddev": 0.16},
+                            },
+                        },
                     ],
                 },
                 {
@@ -415,6 +561,14 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
                                 "kind": "categorical",
                                 "values": ["budget", "midrange", "premium"],
                                 "weights": [0.4, 0.42, 0.18],
+                            },
+                        },
+                        {
+                            "name": "product_price_bias",
+                            "generator": {
+                                "kind": "distribution",
+                                "distribution": "normal",
+                                "parameters": {"mean": 0.0, "stddev": 0.22},
                             },
                         },
                     ],
@@ -486,20 +640,60 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
                 {
                     "name": "order_amount",
                     "generator": {
-                        "kind": "distribution",
+                        "kind": "contextual_distribution",
                         "distribution": "lognormal",
                         "parameters": {
                             "mean": float(overrides.get("amount_log_mean", 3.8)),
                             "stddev": float(overrides.get("amount_stddev", 0.42)),
                         },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "entity_name": "customers",
+                                "entity_attribute": "customer_spend_bias",
+                            },
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "entity_name": "products",
+                                "entity_attribute": "product_price_bias",
+                            },
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": float(overrides.get("gold_loyalty_amount_shift", -0.08)),
+                                "when": [{"field": "loyalty_tier", "equals": "gold"}],
+                            },
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": float(overrides.get("premium_band_amount_shift", 0.3)),
+                                "when": [{"field": "price_band", "equals": "premium"}],
+                            },
+                        ],
                     },
                 },
                 {
                     "name": "is_returned",
                     "generator": {
-                        "kind": "distribution",
+                        "kind": "contextual_distribution",
                         "distribution": "bernoulli",
                         "parameters": {"probability": float(overrides.get("return_probability", 0.08))},
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "probability",
+                                "operation": "multiply",
+                                "value": float(overrides.get("apparel_return_multiplier", 1.4)),
+                                "when": [{"field": "product_category", "equals": "apparel"}],
+                            },
+                            {
+                                "parameter": "probability",
+                                "operation": "multiply",
+                                "value": float(overrides.get("gold_return_multiplier", 0.7)),
+                                "when": [{"field": "loyalty_tier", "equals": "gold"}],
+                            },
+                        ],
                     },
                 },
             ],
@@ -507,6 +701,12 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
                 {
                     "injector_id": "order_amount_spike",
                     "field": "order_amount",
+                    "scope": [
+                        {
+                            "field": "sales_channel",
+                            "equals": "marketplace",
+                        }
+                    ],
                     "selection": {
                         "kind": "rate",
                         "rate": float(overrides.get("anomaly_rate", 0.025)),
@@ -520,6 +720,12 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
                 {
                     "injector_id": "fulfillment_delay",
                     "field": "fulfillment_status",
+                    "scope": [
+                        {
+                            "field": "sales_channel",
+                            "equals": "marketplace",
+                        }
+                    ],
                     "selection": {
                         "kind": "window",
                         "start_index": delay_start,
