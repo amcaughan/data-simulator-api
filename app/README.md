@@ -29,15 +29,19 @@ This package contains the Lambda application code for the data simulator API.
 
 ## Current API Surface
 
-- `/health`
-- `/v1/distributions/sample`
-- `/v1/distributions/generate`
-- `/v1/scenarios/sample`
-- `/v1/scenarios/generate`
-- `/v1/presets`
-- `/v1/presets/{preset_id}/generate`
+- `GET /health`
+- `POST /v1/distributions/sample`
+- `POST /v1/distributions/generate`
+- `POST /v1/scenarios/sample`
+- `POST /v1/scenarios/generate`
+- `GET /v1/presets`
+- `POST /v1/presets/{preset_id}/generate`
 
 ## Sample Requests
+
+HTTP callers should use the methods above and send the JSON body without an `action`
+field. The `action` examples below are direct Lambda invocation payloads, which are
+still useful for local smoke testing and `aws lambda invoke`.
 
 ### Health
 
