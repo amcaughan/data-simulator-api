@@ -66,8 +66,33 @@ class CategoricalGeneratorSpec(BaseModel):
     weights: list[float] | None = None
 
 
-GeneratorSpec = Annotated[
+PrimitiveGeneratorSpec = Annotated[
     DistributionGeneratorSpec | ConstantGeneratorSpec | CategoricalGeneratorSpec,
+    Field(discriminator="kind"),
+]
+
+
+class EntityIdGeneratorSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["entity_id"]
+    entity_name: str
+
+
+class EntityAttributeGeneratorSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["entity_attribute"]
+    entity_name: str
+    attribute: str
+
+
+GeneratorSpec = Annotated[
+    DistributionGeneratorSpec
+    | ConstantGeneratorSpec
+    | CategoricalGeneratorSpec
+    | EntityIdGeneratorSpec
+    | EntityAttributeGeneratorSpec,
     Field(discriminator="kind"),
 ]
 
@@ -78,6 +103,22 @@ class FieldSpec(BaseModel):
     name: str
     generator: GeneratorSpec
     nullable: bool = False
+
+
+class EntityAttributeSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    generator: PrimitiveGeneratorSpec
+
+
+class EntityPoolSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    count: int = Field(ge=1, le=5000)
+    id_prefix: str | None = None
+    attributes: list[EntityAttributeSpec] = Field(default_factory=list)
 
 
 class IndexSelectionSpec(BaseModel):
@@ -204,8 +245,40 @@ class ScenarioRequestBase(BaseModel):
     description: str | None = None
     seed: int | None = None
     time: TimeSpec = Field(default_factory=TimeSpec)
+    entity_pools: list[EntityPoolSpec] = Field(default_factory=list)
     fields: list[FieldSpec]
     injectors: list[InjectorSpec] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_entity_references(self) -> ScenarioRequestBase:
+        pool_names = [pool.name for pool in self.entity_pools]
+        if len(pool_names) != len(set(pool_names)):
+            raise ValueError("entity pool names must be unique")
+
+        pool_attributes: dict[str, set[str]] = {}
+        for pool in self.entity_pools:
+            attribute_names = [attribute.name for attribute in pool.attributes]
+            if len(attribute_names) != len(set(attribute_names)):
+                raise ValueError(f"entity pool attributes must be unique: {pool.name}")
+            pool_attributes[pool.name] = set(attribute_names)
+
+        for field in self.fields:
+            generator = field.generator
+
+            if generator.kind == "entity_id":
+                if generator.entity_name not in pool_attributes:
+                    raise ValueError(f"field {field.name} references unknown entity pool: {generator.entity_name}")
+
+            if generator.kind == "entity_attribute":
+                if generator.entity_name not in pool_attributes:
+                    raise ValueError(f"field {field.name} references unknown entity pool: {generator.entity_name}")
+                if generator.attribute not in pool_attributes[generator.entity_name]:
+                    raise ValueError(
+                        f"field {field.name} references unknown entity attribute: "
+                        f"{generator.entity_name}.{generator.attribute}"
+                    )
+
+        return self
 
 
 class ScenarioSampleRequest(ScenarioRequestBase):
