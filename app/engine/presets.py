@@ -15,6 +15,11 @@ def _prefixed_values(prefix: str, count: int) -> list[str]:
 def list_presets() -> list[dict[str, str]]:
     return [
         {
+            "preset_id": "batch_delivery_benchmark",
+            "title": "Batch Delivery Benchmark",
+            "description": "Synthetic batch-delivered records with source-system and facility dimensions.",
+        },
+        {
             "preset_id": "transaction_benchmark",
             "title": "Transaction Benchmark",
             "description": "Synthetic card-like transactions with card and merchant dimensions.",
@@ -288,6 +293,230 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                         "factor": float(overrides.get("anomaly_scale", 6.0)),
                     },
                 },
+            ],
+        }
+    )
+
+
+def _build_batch_delivery_preset(request: PresetGenerateRequest) -> ScenarioGenerateRequest:
+    overrides = request.overrides
+    row_count = request.row_count
+    facility_count = int(
+        overrides.get("facility_count", _default_entity_count(row_count, ratio=25, minimum=2, maximum=40))
+    )
+    source_system_id = str(overrides.get("source_system_id", "client_a"))
+    delivery_id = str(overrides.get("delivery_id", f"{source_system_id}_delivery_{request.seed or 0:04d}"))
+    delivery_date = str(overrides.get("delivery_date", "2026-01-01"))
+    member_id_start = int(overrides.get("member_id_start", 100000))
+    regime_start = int(overrides.get("regime_start_index", max(1, row_count // 2)))
+
+    return ScenarioGenerateRequest.model_validate(
+        {
+            "schema_version": "1.0",
+            "name": "batch_delivery_benchmark",
+            "description": "Batch-delivered member-like records from a single client feed.",
+            "seed": request.seed,
+            "row_count": row_count,
+            "entity_pools": [
+                {
+                    "name": "facilities",
+                    "count": facility_count,
+                    "id_prefix": "facility",
+                    "attributes": [
+                        {
+                            "name": "facility_region",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["west", "midwest", "south", "northeast"],
+                                "weights": [0.21, 0.24, 0.31, 0.24],
+                            },
+                        },
+                        {
+                            "name": "facility_type",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["hospital_system", "community_clinic", "specialty_group"],
+                                "weights": [0.45, 0.35, 0.2],
+                            },
+                        },
+                        {
+                            "name": "allowed_amount_bias",
+                            "generator": {
+                                "kind": "distribution",
+                                "distribution": "normal",
+                                "parameters": {"mean": 0.0, "stddev": 0.12},
+                            },
+                        },
+                    ],
+                }
+            ],
+            "fields": [
+                {
+                    "name": "source_system_id",
+                    "generator": {
+                        "kind": "constant",
+                        "value": source_system_id,
+                    },
+                },
+                {
+                    "name": "delivery_id",
+                    "generator": {
+                        "kind": "constant",
+                        "value": delivery_id,
+                    },
+                },
+                {
+                    "name": "delivery_date",
+                    "generator": {
+                        "kind": "constant",
+                        "value": delivery_date,
+                    },
+                },
+                {
+                    "name": "record_number",
+                    "generator": {
+                        "kind": "sequence",
+                        "start": 1,
+                        "step": 1,
+                    },
+                },
+                {
+                    "name": "member_id",
+                    "generator": {
+                        "kind": "sequence",
+                        "start": member_id_start,
+                        "step": 1,
+                    },
+                },
+                {
+                    "name": "facility_id",
+                    "generator": {
+                        "kind": "entity_id",
+                        "entity_name": "facilities",
+                    },
+                },
+                {
+                    "name": "facility_region",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "facilities",
+                        "attribute": "facility_region",
+                    },
+                },
+                {
+                    "name": "facility_type",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "facilities",
+                        "attribute": "facility_type",
+                    },
+                },
+                {
+                    "name": "feed_type",
+                    "generator": {
+                        "kind": "constant",
+                        "value": str(overrides.get("feed_type", "member_snapshot")),
+                    },
+                },
+                {
+                    "name": "member_status",
+                    "generator": {
+                        "kind": "categorical",
+                        "values": ["active", "inactive", "pending"],
+                        "weights": [0.84, 0.11, 0.05],
+                    },
+                },
+                {
+                    "name": "plan_tier",
+                    "generator": {
+                        "kind": "categorical",
+                        "values": ["bronze", "silver", "gold"],
+                        "weights": [0.33, 0.46, 0.21],
+                    },
+                },
+                {
+                    "name": "age_band",
+                    "generator": {
+                        "kind": "categorical",
+                        "values": ["0-17", "18-34", "35-49", "50-64", "65+"],
+                        "weights": [0.12, 0.24, 0.22, 0.25, 0.17],
+                    },
+                },
+                {
+                    "name": "postal_prefix",
+                    "generator": {
+                        "kind": "categorical",
+                        "values": ["100", "303", "606", "733", "941"],
+                        "weights": [0.18, 0.19, 0.2, 0.16, 0.27],
+                    },
+                },
+                {
+                    "name": "allowed_amount",
+                    "generator": {
+                        "kind": "contextual_distribution",
+                        "distribution": "lognormal",
+                        "parameters": {
+                            "mean": float(overrides.get("amount_log_mean", 4.1)),
+                            "stddev": float(overrides.get("amount_stddev", 0.32)),
+                        },
+                        "parameter_modifiers": [
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "entity_name": "facilities",
+                                "entity_attribute": "allowed_amount_bias",
+                            },
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": float(overrides.get("gold_plan_amount_shift", 0.18)),
+                                "when": [{"field": "plan_tier", "equals": "gold"}],
+                            },
+                            {
+                                "parameter": "mean",
+                                "operation": "add",
+                                "value": float(overrides.get("senior_amount_shift", 0.12)),
+                                "when": [{"field": "age_band", "equals": "65+"}],
+                            },
+                        ],
+                    },
+                },
+            ],
+            "process_modifiers": [
+                {
+                    "modifier_id": "late_file_shift",
+                    "field": "allowed_amount",
+                    "scope": [
+                        {
+                            "field": "member_status",
+                            "equals": "pending",
+                        }
+                    ],
+                    "selection": {
+                        "kind": "window",
+                        "start_index": regime_start,
+                    },
+                    "parameter_modifiers": [
+                        {
+                            "parameter": "mean",
+                            "operation": "add",
+                            "value": float(overrides.get("late_file_amount_shift", 0.2)),
+                        }
+                    ],
+                }
+            ],
+            "mutations": [
+                {
+                    "mutation_id": "postal_prefix_missing",
+                    "field": "postal_prefix",
+                    "selection": {
+                        "kind": "rate",
+                        "rate": float(overrides.get("postal_missing_rate", 0.02)),
+                    },
+                    "mutation": {
+                        "kind": "set_missing",
+                    },
+                }
             ],
         }
     )
@@ -785,6 +1014,7 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
 
 def build_preset_generate_request(preset_id: str, request: PresetGenerateRequest) -> ScenarioGenerateRequest:
     builders: dict[str, PresetBuilder] = {
+        "batch_delivery_benchmark": _build_batch_delivery_preset,
         "iot_sensor_benchmark": _build_iot_sensor_preset,
         "order_benchmark": _build_order_preset,
         "transaction_benchmark": _build_transaction_preset,

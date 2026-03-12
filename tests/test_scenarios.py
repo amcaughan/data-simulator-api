@@ -974,6 +974,43 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertIn("product_id", payload["fields"])
         self.assertIn("order_amount", payload["fields"])
 
+    def test_batch_delivery_preset_models_one_batch_drop(self):
+        request = build_preset_generate_request(
+            "batch_delivery_benchmark",
+            PresetGenerateRequest(
+                seed=19,
+                row_count=6,
+                overrides={
+                    "source_system_id": "hospital_system_a",
+                    "delivery_id": "hospital_system_a_20260312",
+                    "delivery_date": "2026-03-12",
+                },
+            ),
+        )
+
+        payload = generate_scenario(request)
+
+        self.assertEqual(payload["scenario_name"], "batch_delivery_benchmark")
+        self.assertEqual(payload["row_count"], 6)
+        self.assertIn("source_system_id", payload["fields"])
+        self.assertIn("delivery_id", payload["fields"])
+        self.assertIn("record_number", payload["fields"])
+        self.assertIn("member_id", payload["fields"])
+        self.assertIn("facility_id", payload["fields"])
+        self.assertIn("allowed_amount", payload["fields"])
+        self.assertEqual(
+            {row["source_system_id"] for row in payload["rows"]},
+            {"hospital_system_a"},
+        )
+        self.assertEqual(
+            {row["delivery_id"] for row in payload["rows"]},
+            {"hospital_system_a_20260312"},
+        )
+        self.assertEqual(
+            [row["record_number"] for row in payload["rows"]],
+            [1, 2, 3, 4, 5, 6],
+        )
+
     def test_handler_routes_scenario_generate(self):
         event = {
             "action": "/v1/scenarios/generate",
