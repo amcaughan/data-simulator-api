@@ -130,6 +130,10 @@ resource "aws_api_gateway_stage" "private" {
       stage                  = "$context.stage"
     })
   }
+
+  depends_on = [
+    aws_api_gateway_account.this,
+  ]
 }
 
 resource "aws_route53_record" "private_api_cname" {
