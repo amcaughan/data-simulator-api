@@ -123,34 +123,34 @@ resource "aws_api_gateway_resource" "preset_sample" {
 locals {
   private_api_routes = {
     health_get = {
-      resource_id         = aws_api_gateway_resource.health.id
-      http_method         = "GET"
-      request_parameters  = {}
+      resource_id        = aws_api_gateway_resource.health.id
+      http_method        = "GET"
+      request_parameters = {}
     }
     distributions_sample_post = {
-      resource_id         = aws_api_gateway_resource.distribution_sample.id
-      http_method         = "POST"
-      request_parameters  = {}
+      resource_id        = aws_api_gateway_resource.distribution_sample.id
+      http_method        = "POST"
+      request_parameters = {}
     }
     distributions_generate_post = {
-      resource_id         = aws_api_gateway_resource.distribution_generate.id
-      http_method         = "POST"
-      request_parameters  = {}
+      resource_id        = aws_api_gateway_resource.distribution_generate.id
+      http_method        = "POST"
+      request_parameters = {}
     }
     scenarios_sample_post = {
-      resource_id         = aws_api_gateway_resource.scenario_sample.id
-      http_method         = "POST"
-      request_parameters  = {}
+      resource_id        = aws_api_gateway_resource.scenario_sample.id
+      http_method        = "POST"
+      request_parameters = {}
     }
     scenarios_generate_post = {
-      resource_id         = aws_api_gateway_resource.scenario_generate.id
-      http_method         = "POST"
-      request_parameters  = {}
+      resource_id        = aws_api_gateway_resource.scenario_generate.id
+      http_method        = "POST"
+      request_parameters = {}
     }
     presets_get = {
-      resource_id         = aws_api_gateway_resource.presets.id
-      http_method         = "GET"
-      request_parameters  = {}
+      resource_id        = aws_api_gateway_resource.presets.id
+      http_method        = "GET"
+      request_parameters = {}
     }
     preset_generate_post = {
       resource_id = aws_api_gateway_resource.preset_generate.id
