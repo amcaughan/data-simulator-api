@@ -4,41 +4,32 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.api.models import FieldSpec, ScenarioGenerateRequest, ScenarioRequestBase, ScenarioSampleRequest
-from app.engine.distributions import sample_distribution
+from app.engine.entities import EntityContext, build_entity_context, generate_entity_values
+from app.engine.generators import generate_primitive_values
 from app.engine.injectors import (
     apply_injectors,
     initialize_labels,
     summarize_labels,
     validate_stateless_injectors,
 )
-from app.engine.randomness import derive_seed
 
 
 DEFAULT_SCENARIO_START = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
 
-def _generate_field_values(field: FieldSpec, row_count: int, scenario_seed: int | None) -> list[Any]:
+def _generate_field_values(
+    field: FieldSpec,
+    row_count: int,
+    scenario_seed: int | None,
+    entity_context: EntityContext,
+) -> list[Any]:
     generator = field.generator
-    field_seed = derive_seed(scenario_seed, "field", field.name)
 
-    if generator.kind == "constant":
-        return [generator.value for _ in range(row_count)]
+    if generator.kind in {"constant", "categorical", "distribution"}:
+        return generate_primitive_values(generator, row_count, scenario_seed, "field", field.name)
 
-    if generator.kind == "categorical":
-        return sample_distribution(
-            distribution="categorical",
-            parameters={"values": generator.values, "weights": generator.weights},
-            count=row_count,
-            seed=field_seed,
-        )
-
-    if generator.kind == "distribution":
-        return sample_distribution(
-            distribution=generator.distribution,
-            parameters=generator.parameters,
-            count=row_count,
-            seed=field_seed,
-        )
+    if generator.kind in {"entity_attribute", "entity_id"}:
+        return generate_entity_values(generator, row_count, entity_context)
 
     raise ValueError(f"unsupported generator kind: {generator.kind}")
 
@@ -55,6 +46,7 @@ def _build_rows(request: ScenarioRequestBase, row_count: int, stateless_only: bo
     if stateless_only:
         validate_stateless_injectors(request.injectors)
     start_time = _scenario_start_time(request)
+    entity_context = build_entity_context(request.entity_pools, row_count, request.seed)
 
     rows = [
         {
@@ -65,7 +57,7 @@ def _build_rows(request: ScenarioRequestBase, row_count: int, stateless_only: bo
     ]
 
     for field in request.fields:
-        values = _generate_field_values(field, row_count, request.seed)
+        values = _generate_field_values(field, row_count, request.seed, entity_context)
         for index, value in enumerate(values):
             rows[index][field.name] = value
 
