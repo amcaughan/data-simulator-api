@@ -43,6 +43,10 @@ HTTP callers should use the methods above and send the JSON body without an `act
 field. The `action` examples below are direct Lambda invocation payloads, which are
 still useful for local smoke testing and `aws lambda invoke`.
 
+The private API Gateway methods use `AWS_IAM` authorization. Internal callers should
+use SigV4-signed requests from an AWS principal that has `execute-api:Invoke`
+permission, typically an ECS task role or another workload role inside the shared VPC.
+
 ### Health
 
 ```json
@@ -862,9 +866,11 @@ Pass a different function name if needed:
 ## Private API Deployment
 
 The `dev` stack can also create a private REST API Gateway in front of the Lambda.
-That API is scoped to the shared dev VPC published by `aws_infra`, but it is not tied
-to a specific `execute-api` VPC endpoint ID. Recreating the endpoint layer should not
-require reapplying this repo as long as the shared VPC stays the same.
+That API is scoped to the shared dev VPC published by `aws_infra`, uses explicit route
+definitions at the API Gateway layer, and requires `AWS_IAM` authorization on every
+method. It is not tied to a specific `execute-api` VPC endpoint ID. Recreating the
+endpoint layer should not require reapplying this repo as long as the shared VPC stays
+the same.
 
 ## Design Notes
 
