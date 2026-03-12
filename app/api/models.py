@@ -5,6 +5,18 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+def _find_duplicates(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: list[str] = []
+
+    for value in values:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+
+    return duplicates
+
+
 DistributionName = Literal[
     "bernoulli",
     "categorical",
@@ -78,8 +90,8 @@ class ParameterModifierSpec(BaseModel):
         ]
         if sum(sources) != 1:
             raise ValueError(
-                "parameter modifiers must use exactly one of value, source_field, or "
-                "entity_name/entity_attribute"
+                "parameter modifiers must use exactly one source: value, source_field, "
+                "or entity_name/entity_attribute"
             )
 
         if (self.entity_name is None) != (self.entity_attribute is None):
@@ -218,7 +230,7 @@ class OffsetMutationSpec(BaseModel):
         has_any_range = self.min_amount is not None or self.max_amount is not None
 
         if has_fixed_amount and has_any_range:
-            raise ValueError("offset mutations must use either amount or min_amount/max_amount")
+            raise ValueError("offset mutations must use either amount or min_amount/max_amount, not both")
 
         if has_fixed_amount:
             return self
@@ -244,7 +256,7 @@ class ScaleMutationSpec(BaseModel):
         has_any_range = self.min_factor is not None or self.max_factor is not None
 
         if has_fixed_factor and has_any_range:
-            raise ValueError("scale mutations must use either factor or min_factor/max_factor")
+            raise ValueError("scale mutations must use either factor or min_factor/max_factor, not both")
 
         if has_fixed_factor:
             return self
@@ -349,25 +361,33 @@ class ScenarioRequestBase(BaseModel):
     def validate_references(self) -> ScenarioRequestBase:
         pool_names = [pool.name for pool in self.entity_pools]
         if len(pool_names) != len(set(pool_names)):
-            raise ValueError("entity pool names must be unique")
+            duplicate_pool_names = ", ".join(_find_duplicates(pool_names))
+            raise ValueError(f"entity pool names must be unique; duplicates: {duplicate_pool_names}")
 
         field_names = [field.name for field in self.fields]
         if len(field_names) != len(set(field_names)):
-            raise ValueError("field names must be unique")
+            duplicate_field_names = ", ".join(_find_duplicates(field_names))
+            raise ValueError(f"field names must be unique; duplicates: {duplicate_field_names}")
 
         process_modifier_ids = [modifier.modifier_id for modifier in self.process_modifiers]
         if len(process_modifier_ids) != len(set(process_modifier_ids)):
-            raise ValueError("process modifier ids must be unique")
+            duplicate_modifier_ids = ", ".join(_find_duplicates(process_modifier_ids))
+            raise ValueError(f"process modifier ids must be unique; duplicates: {duplicate_modifier_ids}")
 
         mutation_ids = [mutation.mutation_id for mutation in self.mutations]
         if len(mutation_ids) != len(set(mutation_ids)):
-            raise ValueError("mutation ids must be unique")
+            duplicate_mutation_ids = ", ".join(_find_duplicates(mutation_ids))
+            raise ValueError(f"mutation ids must be unique; duplicates: {duplicate_mutation_ids}")
 
         pool_attributes: dict[str, set[str]] = {}
         for pool in self.entity_pools:
             attribute_names = [attribute.name for attribute in pool.attributes]
             if len(attribute_names) != len(set(attribute_names)):
-                raise ValueError(f"entity pool attributes must be unique: {pool.name}")
+                duplicate_attribute_names = ", ".join(_find_duplicates(attribute_names))
+                raise ValueError(
+                    f"entity pool attributes must be unique for pool {pool.name!r}; "
+                    f"duplicates: {duplicate_attribute_names}"
+                )
             pool_attributes[pool.name] = set(attribute_names)
 
         field_generators: dict[str, GeneratorSpec] = {}
@@ -404,7 +424,8 @@ class ScenarioRequestBase(BaseModel):
             ]
             if field_process_modifiers and generator.kind not in {"distribution", "contextual_distribution"}:
                 raise ValueError(
-                    f"process modifiers can only target distribution fields; invalid field: {field.name}"
+                    "process modifiers can only target distribution or contextual_distribution fields; "
+                    f"field {field.name!r} uses generator kind {generator.kind!r}"
                 )
 
             for process_modifier in field_process_modifiers:

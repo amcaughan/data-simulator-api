@@ -19,6 +19,17 @@ from app.engine.presets import build_preset_generate_request, list_presets
 from app.engine.scenario import generate_scenario, sample_scenario
 
 
+SUPPORTED_ROUTES = [
+    "/health",
+    "/v1/distributions/sample",
+    "/v1/distributions/generate",
+    "/v1/scenarios/sample",
+    "/v1/scenarios/generate",
+    "/v1/presets",
+    "/v1/presets/{preset_id}/generate",
+]
+
+
 def json_response(status_code: int, payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "statusCode": status_code,
@@ -54,11 +65,27 @@ def _extract_preset_id(route: str, event: dict[str, Any]) -> str | None:
     return None
 
 
+def _format_validation_error(exc: ValidationError) -> str:
+    errors = exc.errors()
+    if not errors:
+        return "request validation failed"
+
+    first_error = errors[0]
+    location = ".".join(str(part) for part in first_error.get("loc", ()))
+    message = first_error.get("msg", "invalid value")
+
+    if len(errors) == 1:
+        return f"validation failed at {location}: {message}"
+
+    return f"validation failed at {location}: {message} ({len(errors) - 1} additional validation issues)"
+
+
 def handle_request(event: dict[str, Any]) -> dict[str, Any]:
     route = _resolve_route(event)
-    payload = _extract_payload(event)
 
     try:
+        payload = _extract_payload(event)
+
         if route == "/health":
             return json_response(
                 200,
@@ -96,10 +123,28 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any]:
             return json_response(200, generate_scenario(scenario_request))
 
         if route.startswith("/v1/presets/") and route.endswith("/generate"):
-            raise ValueError("preset generate requires a preset_id")
+            raise ValueError(
+                "preset generate requires a preset_id in the route, for example "
+                "'/v1/presets/transaction_benchmark/generate'"
+            )
 
     except ValidationError as exc:
-        return json_response(400, {"error": "validation_error", "details": json.loads(exc.json())})
+        return json_response(
+            400,
+            {
+                "error": "validation_error",
+                "message": _format_validation_error(exc),
+                "details": json.loads(exc.json()),
+            },
+        )
+    except json.JSONDecodeError as exc:
+        return json_response(
+            400,
+            {
+                "error": "bad_request",
+                "message": f"request body must be valid JSON: {exc.msg}",
+            },
+        )
     except ValueError as exc:
         return json_response(400, {"error": "bad_request", "message": str(exc)})
 
@@ -107,6 +152,6 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any]:
         404,
         {
             "error": "not_found",
-            "message": f"unknown route: {route}",
+            "message": f"unknown route: {route}. Supported routes: {', '.join(SUPPORTED_ROUTES)}",
         },
     )

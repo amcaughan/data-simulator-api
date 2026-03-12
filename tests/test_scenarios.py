@@ -1060,6 +1060,52 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(response["statusCode"], 400)
         self.assertEqual(payload["error"], "bad_request")
 
+    def test_handler_returns_validation_summary_for_invalid_request(self):
+        event = {
+            "action": "/v1/scenarios/generate",
+            "name": "invalid_request",
+            "row_count": 2,
+            "fields": [
+                {
+                    "name": "value",
+                    "generator": {
+                        "kind": "distribution",
+                        "distribution": "normal",
+                        "parameters": {"mean": 1.0, "stddev": 0.5},
+                    },
+                },
+                {
+                    "name": "value",
+                    "generator": {
+                        "kind": "distribution",
+                        "distribution": "normal",
+                        "parameters": {"mean": 2.0, "stddev": 0.5},
+                    },
+                },
+            ],
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(payload["error"], "validation_error")
+        self.assertIn("field names must be unique", payload["message"])
+        self.assertIn("details", payload)
+
+    def test_handler_returns_json_error_for_invalid_body(self):
+        event = {
+            "rawPath": "/v1/scenarios/generate",
+            "body": '{"name":"bad_json"',
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(payload["error"], "bad_request")
+        self.assertIn("request body must be valid JSON", payload["message"])
+
     def test_handler_routes_distribution_generate(self):
         event = {
             "action": "/v1/distributions/generate",
