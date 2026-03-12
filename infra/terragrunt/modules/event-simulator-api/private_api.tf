@@ -95,13 +95,6 @@ resource "aws_api_gateway_stage" "private" {
   deployment_id = aws_api_gateway_deployment.private.id
   stage_name    = local.private_api_stage_name
 
-  method_settings {
-    method_path        = "*/*"
-    logging_level      = "ERROR"
-    metrics_enabled    = true
-    data_trace_enabled = false
-  }
-
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.private_api_access.arn
     format = jsonencode({
@@ -121,6 +114,18 @@ resource "aws_api_gateway_stage" "private" {
   depends_on = [
     aws_api_gateway_account.this,
   ]
+}
+
+resource "aws_api_gateway_method_settings" "private" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  stage_name  = aws_api_gateway_stage.private.stage_name
+  method_path = "*/*"
+
+  settings {
+    logging_level      = "ERROR"
+    metrics_enabled    = true
+    data_trace_enabled = false
+  }
 }
 
 resource "aws_ssm_parameter" "private_api_invoke_url" {
