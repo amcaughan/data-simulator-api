@@ -86,9 +86,6 @@ Providing a `seed` makes distribution outputs deterministic for the same request
   "action": "/v1/scenarios/sample",
   "name": "simple_sample",
   "seed": 11,
-  "time": {
-    "frequency_seconds": 60
-  },
   "fields": [
     {
       "name": "value",
@@ -127,9 +124,6 @@ Providing a `seed` makes distribution outputs deterministic for the same request
   "name": "simple_generate",
   "seed": 11,
   "row_count": 100,
-  "time": {
-    "frequency_seconds": 60
-  },
   "fields": [
     {
       "name": "value",
@@ -173,7 +167,31 @@ Injected rows keep mutation provenance in their labels. Each label includes the 
 
 Offset mutations accept either a fixed `amount` or a ranged `min_amount` / `max_amount`. Scale mutations accept either a fixed `factor` or a ranged `min_factor` / `max_factor`; for example, `factor: 1.2` means a 20% increase.
 
-Providing a `seed` makes scenario outputs deterministic for the same request. If `time.start` is omitted on a seeded scenario, the engine uses a fixed UTC baseline so event timestamps are deterministic too.
+Providing a `seed` makes scenario outputs deterministic for the same request.
+
+### Sequence Fields
+
+`sequence` is the generic row-by-row counter primitive. It is useful for things like
+batch record numbers, row offsets, simple synthetic IDs, or poll counters.
+
+```json
+{
+  "action": "/v1/scenarios/generate",
+  "name": "sequence_generate",
+  "seed": 13,
+  "row_count": 4,
+  "fields": [
+    {
+      "name": "customer_id",
+      "generator": {
+        "kind": "sequence",
+        "start": 1000,
+        "step": 5
+      }
+    }
+  ]
+}
+```
 
 ### Scenario Generate With Entities
 
@@ -189,9 +207,6 @@ slightly differently by segment or entity.
   "name": "entity_generate",
   "seed": 29,
   "row_count": 12,
-  "time": {
-    "frequency_seconds": 300
-  },
   "entity_pools": [
     {
       "name": "customers",
@@ -348,9 +363,6 @@ then shifts into an online, high-risk period with larger amounts and more declin
   "name": "card_takeover",
   "seed": 77,
   "row_count": 120,
-  "time": {
-    "frequency_seconds": 300
-  },
   "entity_pools": [
     {
       "name": "cards",
@@ -493,9 +505,6 @@ noise profile, and a subset of pressure sensors experience a dropout window.
   "name": "sensor_fleet",
   "seed": 101,
   "row_count": 180,
-  "time": {
-    "frequency_seconds": 60
-  },
   "entity_pools": [
     {
       "name": "devices",
@@ -609,9 +618,6 @@ region, price band, or return rate.
   "name": "order_flow",
   "seed": 202,
   "row_count": 150,
-  "time": {
-    "frequency_seconds": 900
-  },
   "entity_pools": [
     {
       "name": "customers",

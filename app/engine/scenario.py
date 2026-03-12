@@ -20,7 +20,7 @@ def _generate_field_values(
     generator = field.generator
     row_count = len(rows)
 
-    if generator.kind in {"constant", "categorical", "distribution"}:
+    if generator.kind in {"constant", "categorical", "distribution", "sequence"}:
         return generate_primitive_values(generator, row_count, scenario_seed, "field", field.name)
 
     if generator.kind == "contextual_distribution":

@@ -20,7 +20,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "simple_generate",
                 "seed": 11,
                 "row_count": 6,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -67,7 +66,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "rate_generate",
                 "seed": 17,
                 "row_count": 50,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -109,7 +107,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "count_generate",
                 "seed": 23,
                 "row_count": 10,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -148,7 +145,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "deterministic_generate",
                 "seed": 23,
                 "row_count": 10,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -188,7 +184,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "entity_generate",
                 "seed": 29,
                 "row_count": 12,
-                "time": {"frequency_seconds": 300},
                 "entity_pools": [
                     {
                         "name": "customers",
@@ -272,7 +267,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "deterministic_entity_generate",
                 "seed": 31,
                 "row_count": 10,
-                "time": {"frequency_seconds": 120},
                 "entity_pools": [
                     {
                         "name": "devices",
@@ -319,7 +313,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "contextual_generate",
                 "seed": 41,
                 "row_count": 4,
-                "time": {"frequency_seconds": 60},
                 "entity_pools": [
                     {
                         "name": "customers",
@@ -394,7 +387,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "scoped_injectors",
                 "seed": 43,
                 "row_count": 6,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "segment",
@@ -464,7 +456,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "bad_count_generate",
                 "seed": 23,
                 "row_count": 2,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -500,7 +491,6 @@ class ScenarioEngineTest(unittest.TestCase):
             {
                 "name": "sample_once",
                 "seed": 5,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -539,7 +529,6 @@ class ScenarioEngineTest(unittest.TestCase):
             {
                 "name": "count_sample",
                 "seed": 5,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -577,7 +566,6 @@ class ScenarioEngineTest(unittest.TestCase):
             {
                 "name": "deterministic_sample",
                 "seed": 5,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -616,7 +604,6 @@ class ScenarioEngineTest(unittest.TestCase):
             {
                 "name": "bad_count_sample",
                 "seed": 5,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -652,7 +639,6 @@ class ScenarioEngineTest(unittest.TestCase):
             {
                 "name": "invalid_sample",
                 "seed": 5,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -689,7 +675,6 @@ class ScenarioEngineTest(unittest.TestCase):
                 "name": "range_generate",
                 "seed": 41,
                 "row_count": 4,
-                "time": {"frequency_seconds": 60},
                 "fields": [
                     {
                         "name": "value",
@@ -755,6 +740,29 @@ class ScenarioEngineTest(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_generate_scenario_supports_sequence_fields(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "sequence_generate",
+                "seed": 13,
+                "row_count": 4,
+                "fields": [
+                    {
+                        "name": "customer_id",
+                        "generator": {
+                            "kind": "sequence",
+                            "start": 1000,
+                            "step": 5,
+                        },
+                    }
+                ],
+            }
+        )
+
+        payload = generate_scenario(request)
+
+        self.assertEqual([row["customer_id"] for row in payload["rows"]], [1000, 1005, 1010, 1015])
+
     def test_iot_preset_includes_device_dimensions(self):
         request = build_preset_generate_request(
             "iot_sensor_benchmark",
@@ -787,7 +795,6 @@ class ScenarioEngineTest(unittest.TestCase):
             "name": "handler_generate",
             "seed": 9,
             "row_count": 3,
-            "time": {"frequency_seconds": 60},
             "fields": [
                 {
                     "name": "status",
@@ -812,7 +819,6 @@ class ScenarioEngineTest(unittest.TestCase):
             "action": "/v1/scenarios/sample",
             "name": "handler_sample",
             "seed": 9,
-            "time": {"frequency_seconds": 60},
             "fields": [
                 {
                     "name": "status",
@@ -837,7 +843,6 @@ class ScenarioEngineTest(unittest.TestCase):
             "action": "/v1/scenarios/sample",
             "name": "bad_sample",
             "seed": 9,
-            "time": {"frequency_seconds": 60},
             "fields": [
                 {
                     "name": "value",
