@@ -177,9 +177,11 @@ Providing a `seed` makes scenario outputs deterministic for the same request. If
 
 ### Scenario Generate With Entities
 
-Entity pools make it possible to emit repeated IDs and stable per-entity dimensions.
-That is useful for downstream ELT work because the generated rows can be grouped by
-things like `customer_id`, `merchant_id`, `device_id`, or `product_id`.
+Entity pools make it possible to emit repeated IDs, stable per-entity dimensions, and
+stable hidden entity attributes that can shape row-level distributions. That is useful
+for downstream ELT work because the generated rows can be grouped by things like
+`customer_id`, `merchant_id`, `device_id`, or `product_id`, while still behaving
+slightly differently by segment or entity.
 
 ```json
 {
@@ -241,12 +243,89 @@ things like `customer_id`, `merchant_id`, `device_id`, or `product_id`.
     {
       "name": "amount",
       "generator": {
-        "kind": "distribution",
+        "kind": "contextual_distribution",
         "distribution": "lognormal",
         "parameters": {
           "mean": 3.5,
           "stddev": 0.3
+        },
+        "parameter_modifiers": [
+          {
+            "parameter": "mean",
+            "operation": "add",
+            "value": 0.4,
+            "when": [
+              {
+                "field": "loyalty_tier",
+                "equals": "gold"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+`contextual_distribution` starts from a normal distribution definition and then adjusts
+one or more distribution parameters per row. Modifiers can use:
+
+- a fixed numeric `value`
+- an earlier generated `source_field`
+- a hidden `entity_name` / `entity_attribute` value from an entity pool
+
+Modifiers are applied in order, so the request stays readable.
+
+### Scoped Injectors
+
+Injectors can also be scoped to a subset of rows. That is useful when one segment or
+entity should behave differently even though the overall scenario stays the same.
+
+```json
+{
+  "action": "/v1/scenarios/generate",
+  "name": "scoped_generate",
+  "seed": 43,
+  "row_count": 6,
+  "fields": [
+    {
+      "name": "segment",
+      "generator": {
+        "kind": "categorical",
+        "values": ["target", "other"],
+        "weights": [0.5, 0.5]
+      }
+    },
+    {
+      "name": "value",
+      "generator": {
+        "kind": "distribution",
+        "distribution": "normal",
+        "parameters": {
+          "mean": 5.0,
+          "stddev": 1.0
         }
+      }
+    }
+  ],
+  "injectors": [
+    {
+      "injector_id": "target_only",
+      "field": "value",
+      "scope": [
+        {
+          "field": "segment",
+          "equals": "target"
+        }
+      ],
+      "selection": {
+        "kind": "count",
+        "count": 1
+      },
+      "mutation": {
+        "kind": "offset",
+        "amount": 5.0
       }
     }
   ]

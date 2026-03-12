@@ -313,6 +313,132 @@ class ScenarioEngineTest(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_generate_scenario_supports_contextual_distribution(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "contextual_generate",
+                "seed": 41,
+                "row_count": 4,
+                "time": {"frequency_seconds": 60},
+                "entity_pools": [
+                    {
+                        "name": "customers",
+                        "count": 1,
+                        "attributes": [
+                            {
+                                "name": "spend_bias",
+                                "generator": {
+                                    "kind": "constant",
+                                    "value": 2.0,
+                                },
+                            },
+                            {
+                                "name": "customer_segment",
+                                "generator": {
+                                    "kind": "constant",
+                                    "value": "vip",
+                                },
+                            },
+                        ],
+                    }
+                ],
+                "fields": [
+                    {
+                        "name": "customer_id",
+                        "generator": {
+                            "kind": "entity_id",
+                            "entity_name": "customers",
+                        },
+                    },
+                    {
+                        "name": "customer_segment",
+                        "generator": {
+                            "kind": "entity_attribute",
+                            "entity_name": "customers",
+                            "attribute": "customer_segment",
+                        },
+                    },
+                    {
+                        "name": "amount",
+                        "generator": {
+                            "kind": "contextual_distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 10.0, "stddev": 0.0},
+                            "parameter_modifiers": [
+                                {
+                                    "parameter": "mean",
+                                    "operation": "add",
+                                    "entity_name": "customers",
+                                    "entity_attribute": "spend_bias",
+                                },
+                                {
+                                    "parameter": "mean",
+                                    "operation": "add",
+                                    "value": 3.0,
+                                    "when": [{"field": "customer_segment", "equals": "vip"}],
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }
+        )
+
+        payload = generate_scenario(request)
+
+        self.assertEqual([row["amount"] for row in payload["rows"]], [15.0, 15.0, 15.0, 15.0])
+
+    def test_generate_scenario_supports_scoped_injectors(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "scoped_injectors",
+                "seed": 43,
+                "row_count": 6,
+                "time": {"frequency_seconds": 60},
+                "fields": [
+                    {
+                        "name": "segment",
+                        "generator": {
+                            "kind": "categorical",
+                            "values": ["target", "other"],
+                            "weights": [0.5, 0.5],
+                        },
+                    },
+                    {
+                        "name": "value",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 5.0, "stddev": 0.0},
+                        },
+                    },
+                ],
+                "injectors": [
+                    {
+                        "injector_id": "target_only",
+                        "field": "value",
+                        "scope": [{"field": "segment", "equals": "target"}],
+                        "selection": {
+                            "kind": "count",
+                            "count": 1,
+                        },
+                        "mutation": {
+                            "kind": "offset",
+                            "amount": 5.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        payload = generate_scenario(request)
+
+        targeted_rows = [row for row in payload["rows"] if row["segment"] == "target" and row["__is_anomaly"]]
+        non_targeted_rows = [row for row in payload["rows"] if row["segment"] != "target" and row["__is_anomaly"]]
+
+        self.assertEqual(len(targeted_rows), 1)
+        self.assertEqual(len(non_targeted_rows), 0)
+
     def test_scenario_rejects_unknown_entity_reference(self):
         with self.assertRaisesRegex(ValueError, "unknown entity pool"):
             ScenarioGenerateRequest.model_validate(
@@ -366,7 +492,7 @@ class ScenarioEngineTest(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "count selection requires count <= row_count"):
+        with self.assertRaisesRegex(ValueError, "count selection requires count <= eligible_row_count"):
             generate_scenario(request)
 
     def test_sample_scenario_supports_stateless_injectors(self):
@@ -518,7 +644,7 @@ class ScenarioEngineTest(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "count selection requires count <= row_count"):
+        with self.assertRaisesRegex(ValueError, "count selection requires count <= eligible_row_count"):
             sample_scenario(request)
 
     def test_sample_scenario_rejects_stateful_selectors(self):
