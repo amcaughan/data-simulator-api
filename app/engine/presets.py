@@ -4,17 +4,30 @@ from collections.abc import Callable
 from app.api.models import PresetGenerateRequest, ScenarioGenerateRequest
 
 
+def _default_entity_count(row_count: int, ratio: int, minimum: int, maximum: int) -> int:
+    return max(minimum, min(maximum, max(1, row_count // ratio)))
+
+
+def _prefixed_values(prefix: str, count: int) -> list[str]:
+    return [f"{prefix}_{index:03d}" for index in range(1, count + 1)]
+
+
 def list_presets() -> list[dict[str, str]]:
     return [
         {
             "preset_id": "transaction_benchmark",
             "title": "Transaction Benchmark",
-            "description": "Synthetic card-like transactions with amount anomalies and regime shift behavior.",
+            "description": "Synthetic card-like transactions with card and merchant dimensions.",
         },
         {
             "preset_id": "iot_sensor_benchmark",
             "title": "IoT Sensor Benchmark",
-            "description": "Synthetic sensor telemetry with level shifts, missing bursts, and stuck values.",
+            "description": "Synthetic sensor telemetry with device and site dimensions.",
+        },
+        {
+            "preset_id": "order_benchmark",
+            "title": "Order Benchmark",
+            "description": "Synthetic order events with customer and product dimensions.",
         },
     ]
 
@@ -26,6 +39,10 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
     overrides = request.overrides
     row_count = request.row_count
     regime_start = int(overrides.get("regime_start_index", max(1, row_count // 2)))
+    card_count = int(overrides.get("card_count", _default_entity_count(row_count, ratio=4, minimum=6, maximum=250)))
+    merchant_count = int(
+        overrides.get("merchant_count", _default_entity_count(row_count, ratio=6, minimum=4, maximum=100))
+    )
 
     return ScenarioGenerateRequest.model_validate(
         {
@@ -37,7 +54,117 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
             "time": {
                 "frequency_seconds": int(overrides.get("frequency_seconds", 300)),
             },
+            "entity_pools": [
+                {
+                    "name": "cards",
+                    "count": card_count,
+                    "id_prefix": "card",
+                    "attributes": [
+                        {
+                            "name": "card_region",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["west", "midwest", "south", "northeast"],
+                                "weights": [0.22, 0.24, 0.32, 0.22],
+                            },
+                        },
+                        {
+                            "name": "card_segment",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["standard", "premium", "small_business"],
+                                "weights": [0.7, 0.2, 0.1],
+                            },
+                        },
+                    ],
+                },
+                {
+                    "name": "merchants",
+                    "count": merchant_count,
+                    "id_prefix": "merchant",
+                    "attributes": [
+                        {
+                            "name": "merchant_category",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["grocery", "fuel", "retail", "travel", "dining"],
+                                "weights": [0.3, 0.18, 0.28, 0.08, 0.16],
+                            },
+                        },
+                        {
+                            "name": "merchant_region",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["west", "midwest", "south", "northeast"],
+                                "weights": [0.21, 0.25, 0.31, 0.23],
+                            },
+                        },
+                        {
+                            "name": "merchant_risk_tier",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["low", "medium", "high"],
+                                "weights": [0.65, 0.25, 0.1],
+                            },
+                        },
+                    ],
+                },
+            ],
             "fields": [
+                {
+                    "name": "card_id",
+                    "generator": {
+                        "kind": "entity_id",
+                        "entity_name": "cards",
+                    },
+                },
+                {
+                    "name": "card_region",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "cards",
+                        "attribute": "card_region",
+                    },
+                },
+                {
+                    "name": "card_segment",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "cards",
+                        "attribute": "card_segment",
+                    },
+                },
+                {
+                    "name": "merchant_id",
+                    "generator": {
+                        "kind": "entity_id",
+                        "entity_name": "merchants",
+                    },
+                },
+                {
+                    "name": "merchant_category",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "merchants",
+                        "attribute": "merchant_category",
+                    },
+                },
+                {
+                    "name": "merchant_region",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "merchants",
+                        "attribute": "merchant_region",
+                    },
+                },
+                {
+                    "name": "merchant_risk_tier",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "merchants",
+                        "attribute": "merchant_risk_tier",
+                    },
+                },
                 {
                     "name": "amount",
                     "generator": {
@@ -47,14 +174,6 @@ def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerat
                             "mean": float(overrides.get("amount_log_mean", 4.0)),
                             "stddev": float(overrides.get("amount_stddev", 0.35)),
                         },
-                    },
-                },
-                {
-                    "name": "merchant_category",
-                    "generator": {
-                        "kind": "categorical",
-                        "values": ["grocery", "fuel", "retail", "travel"],
-                        "weights": [0.45, 0.2, 0.25, 0.1],
                     },
                 },
                 {
@@ -110,6 +229,8 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
     missing_start = int(overrides.get("missing_start_index", max(1, row_count // 3)))
     stuck_start = int(overrides.get("stuck_start_index", max(1, row_count // 2)))
     stuck_value = float(overrides.get("stuck_value", overrides.get("temperature_mean", 22.0)))
+    site_count = int(overrides.get("site_count", _default_entity_count(row_count, ratio=30, minimum=3, maximum=24)))
+    device_count = int(overrides.get("device_count", _default_entity_count(row_count, ratio=8, minimum=6, maximum=150)))
 
     return ScenarioGenerateRequest.model_validate(
         {
@@ -121,7 +242,54 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
             "time": {
                 "frequency_seconds": int(overrides.get("frequency_seconds", 60)),
             },
+            "entity_pools": [
+                {
+                    "name": "devices",
+                    "count": device_count,
+                    "id_prefix": "device",
+                    "attributes": [
+                        {
+                            "name": "site_id",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": _prefixed_values("site", site_count),
+                            },
+                        },
+                        {
+                            "name": "device_type",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["thermometer", "pressure_sensor", "combo_sensor"],
+                                "weights": [0.35, 0.25, 0.4],
+                            },
+                        },
+                    ],
+                }
+            ],
             "fields": [
+                {
+                    "name": "device_id",
+                    "generator": {
+                        "kind": "entity_id",
+                        "entity_name": "devices",
+                    },
+                },
+                {
+                    "name": "site_id",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "devices",
+                        "attribute": "site_id",
+                    },
+                },
+                {
+                    "name": "device_type",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "devices",
+                        "attribute": "device_type",
+                    },
+                },
                 {
                     "name": "temperature_c",
                     "generator": {
@@ -183,9 +351,194 @@ def _build_iot_sensor_preset(request: PresetGenerateRequest) -> ScenarioGenerate
     )
 
 
+def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateRequest:
+    overrides = request.overrides
+    row_count = request.row_count
+    delay_start = int(overrides.get("delay_start_index", max(1, row_count // 2)))
+    customer_count = int(
+        overrides.get("customer_count", _default_entity_count(row_count, ratio=5, minimum=8, maximum=300))
+    )
+    product_count = int(
+        overrides.get("product_count", _default_entity_count(row_count, ratio=7, minimum=6, maximum=200))
+    )
+
+    return ScenarioGenerateRequest.model_validate(
+        {
+            "schema_version": "1.0",
+            "name": "order_benchmark",
+            "description": "Order-like events with customer and product dimensions.",
+            "seed": request.seed,
+            "row_count": row_count,
+            "time": {
+                "frequency_seconds": int(overrides.get("frequency_seconds", 900)),
+            },
+            "entity_pools": [
+                {
+                    "name": "customers",
+                    "count": customer_count,
+                    "id_prefix": "customer",
+                    "attributes": [
+                        {
+                            "name": "customer_region",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["west", "midwest", "south", "northeast"],
+                                "weights": [0.2, 0.24, 0.34, 0.22],
+                            },
+                        },
+                        {
+                            "name": "loyalty_tier",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["standard", "silver", "gold"],
+                                "weights": [0.65, 0.23, 0.12],
+                            },
+                        },
+                    ],
+                },
+                {
+                    "name": "products",
+                    "count": product_count,
+                    "id_prefix": "product",
+                    "attributes": [
+                        {
+                            "name": "product_category",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["apparel", "electronics", "home", "beauty", "outdoor"],
+                                "weights": [0.24, 0.18, 0.22, 0.16, 0.2],
+                            },
+                        },
+                        {
+                            "name": "price_band",
+                            "generator": {
+                                "kind": "categorical",
+                                "values": ["budget", "midrange", "premium"],
+                                "weights": [0.4, 0.42, 0.18],
+                            },
+                        },
+                    ],
+                },
+            ],
+            "fields": [
+                {
+                    "name": "customer_id",
+                    "generator": {
+                        "kind": "entity_id",
+                        "entity_name": "customers",
+                    },
+                },
+                {
+                    "name": "customer_region",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "customers",
+                        "attribute": "customer_region",
+                    },
+                },
+                {
+                    "name": "loyalty_tier",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "customers",
+                        "attribute": "loyalty_tier",
+                    },
+                },
+                {
+                    "name": "product_id",
+                    "generator": {
+                        "kind": "entity_id",
+                        "entity_name": "products",
+                    },
+                },
+                {
+                    "name": "product_category",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "products",
+                        "attribute": "product_category",
+                    },
+                },
+                {
+                    "name": "price_band",
+                    "generator": {
+                        "kind": "entity_attribute",
+                        "entity_name": "products",
+                        "attribute": "price_band",
+                    },
+                },
+                {
+                    "name": "sales_channel",
+                    "generator": {
+                        "kind": "categorical",
+                        "values": ["web", "mobile", "marketplace"],
+                        "weights": [0.45, 0.4, 0.15],
+                    },
+                },
+                {
+                    "name": "fulfillment_status",
+                    "generator": {
+                        "kind": "categorical",
+                        "values": ["processing", "packed", "shipped"],
+                        "weights": [0.25, 0.2, 0.55],
+                    },
+                },
+                {
+                    "name": "order_amount",
+                    "generator": {
+                        "kind": "distribution",
+                        "distribution": "lognormal",
+                        "parameters": {
+                            "mean": float(overrides.get("amount_log_mean", 3.8)),
+                            "stddev": float(overrides.get("amount_stddev", 0.42)),
+                        },
+                    },
+                },
+                {
+                    "name": "is_returned",
+                    "generator": {
+                        "kind": "distribution",
+                        "distribution": "bernoulli",
+                        "parameters": {"probability": float(overrides.get("return_probability", 0.08))},
+                    },
+                },
+            ],
+            "injectors": [
+                {
+                    "injector_id": "order_amount_spike",
+                    "field": "order_amount",
+                    "selection": {
+                        "kind": "rate",
+                        "rate": float(overrides.get("anomaly_rate", 0.025)),
+                    },
+                    "mutation": {
+                        "kind": "scale",
+                        "min_factor": float(overrides.get("min_anomaly_scale", 2.0)),
+                        "max_factor": float(overrides.get("max_anomaly_scale", 4.5)),
+                    },
+                },
+                {
+                    "injector_id": "fulfillment_delay",
+                    "field": "fulfillment_status",
+                    "selection": {
+                        "kind": "window",
+                        "start_index": delay_start,
+                        "end_index": min(row_count, delay_start + int(overrides.get("delay_length", 10))),
+                    },
+                    "mutation": {
+                        "kind": "set_value",
+                        "value": "delayed",
+                    },
+                },
+            ],
+        }
+    )
+
+
 def build_preset_generate_request(preset_id: str, request: PresetGenerateRequest) -> ScenarioGenerateRequest:
     builders: dict[str, PresetBuilder] = {
         "iot_sensor_benchmark": _build_iot_sensor_preset,
+        "order_benchmark": _build_order_preset,
         "transaction_benchmark": _build_transaction_preset,
     }
 
