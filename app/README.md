@@ -226,8 +226,13 @@ That API is scoped to the shared dev VPC published by `aws_infra`, but it is not
 to a specific `execute-api` VPC endpoint ID. Recreating the endpoint layer should not
 require reapplying this repo as long as the shared VPC stays the same.
 
-If a stable internal DNS name is added later, it should live with the shared endpoint
-stack in `aws_infra` so the name goes away when the endpoint layer is torn down.
+When the shared endpoint stack also publishes the `dev.internal` private hosted zone,
+this stack creates `simulator-api.dev.internal` as a readable internal name for the API.
+The URL still includes the stage path, for example `https://simulator-api.dev.internal/dev`.
+
+The hosted zone lives in `aws_infra`, so tearing down the shared endpoint stack also
+removes the internal DNS layer. Recreating that stack requires reapplying this repo so
+the API record can be recreated in the new hosted zone.
 
 ## Design Notes
 

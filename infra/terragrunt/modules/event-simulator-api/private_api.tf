@@ -6,6 +6,12 @@ data "aws_ssm_parameter" "private_api_allowed_vpc" {
   name = var.private_api_allowed_vpc_ssm_param_name
 }
 
+data "aws_ssm_parameter" "private_api_dns_zone_id" {
+  count = var.private_api_enabled && var.private_api_dns_name != null ? 1 : 0
+
+  name = var.private_api_dns_zone_id_ssm_param_name
+}
+
 locals {
   private_api_stage_name = coalesce(var.private_api_stage_name, var.environment)
 }
@@ -124,6 +130,18 @@ resource "aws_api_gateway_stage" "private" {
       stage                  = "$context.stage"
     })
   }
+}
+
+resource "aws_route53_record" "private_api_cname" {
+  count = var.private_api_enabled && var.private_api_dns_name != null ? 1 : 0
+
+  zone_id = data.aws_ssm_parameter.private_api_dns_zone_id[0].value
+  name    = var.private_api_dns_name
+  type    = "CNAME"
+  ttl     = 60
+  records = [
+    "${aws_api_gateway_rest_api.private[0].id}.execute-api.${data.aws_region.current.region}.amazonaws.com",
+  ]
 }
 
 resource "aws_lambda_permission" "private_api_gateway" {

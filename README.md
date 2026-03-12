@@ -22,6 +22,7 @@ Current MVP
 
 - Lambda deployed as a zip package
 - private REST API Gateway enabled for `dev` and scoped to the shared dev VPC from `aws_infra`
+- readable internal DNS name published in the shared `dev.internal` zone when the endpoint stack exists
 - direct dependencies declared in `app/requirements.in`
 - deployable dependency lockfile compiled to `app/requirements.txt`
 - package build performed by Terraform during apply

@@ -70,6 +70,24 @@ variable "private_api_allowed_vpc_ssm_param_name" {
   }
 }
 
+variable "private_api_dns_name" {
+  type    = string
+  default = null
+}
+
+variable "private_api_dns_zone_id_ssm_param_name" {
+  type    = string
+  default = null
+
+  validation {
+    condition = (
+      var.private_api_dns_name == null ||
+      var.private_api_dns_zone_id_ssm_param_name != null
+    )
+    error_message = "private_api_dns_zone_id_ssm_param_name must be set when private_api_dns_name is provided."
+  }
+}
+
 variable "private_api_log_retention_in_days" {
   type    = number
   default = 14
