@@ -42,6 +42,10 @@ resource "aws_api_gateway_rest_api" "private" {
   endpoint_configuration {
     types = ["PRIVATE"]
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_api_gateway_resource" "proxy" {
@@ -90,6 +94,13 @@ resource "aws_api_gateway_stage" "private" {
   rest_api_id   = aws_api_gateway_rest_api.private.id
   deployment_id = aws_api_gateway_deployment.private.id
   stage_name    = local.private_api_stage_name
+
+  method_settings {
+    method_path       = "*/*"
+    logging_level     = "ERROR"
+    metrics_enabled   = true
+    data_trace_enabled = false
+  }
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.private_api_access.arn

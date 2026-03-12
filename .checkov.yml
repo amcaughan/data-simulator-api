@@ -9,3 +9,8 @@ skip-check:
   - CKV2_AWS_73 # The DLQ already uses AWS-managed SQS encryption; a CMK is not worth the extra key management here
   - CKV_AWS_73 # API Gateway X-Ray tracing is optional and not needed for this private MVP
   - CKV2_AWS_29 # A WAF is unnecessary for a VPC-only private API Gateway
+  - CKV_AWS_59 # This private API is intentionally VPC-scoped today; IAM auth can be added later without changing the backend shape
+  - CKV_AWS_120 # API Gateway caching is not appropriate for low-volume POST-heavy synthetic generation responses
+  - CKV2_AWS_53 # Lambda proxy validation is the source of truth for varied scenario payloads; API Gateway request models would add duplicate rigid schemas
+  - CKV2_AWS_34 # The private API URL in SSM is service discovery metadata, not secret material
+  - CKV2_AWS_51 # Client certificate auth is unnecessary for a VPC-only private API consumed by internal AWS workloads
