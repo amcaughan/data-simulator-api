@@ -54,6 +54,7 @@ def plan_process_modifiers(
                 scenario_seed,
                 "process_modifier",
                 process_modifier.modifier_id,
+                process_modifier.field,
             )
         )
         plans.append(PlannedProcessModifier(spec=process_modifier, selected_indexes=selected_indexes))

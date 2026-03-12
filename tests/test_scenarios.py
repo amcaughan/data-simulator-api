@@ -544,7 +544,75 @@ class ScenarioEngineTest(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "count selection requires count <= eligible_row_count"):
+        with self.assertRaisesRegex(ValueError, "eligible_row_count=2"):
+            generate_scenario(request)
+
+    def test_generate_scenario_explains_empty_scoped_count_selection(self):
+        request = ScenarioGenerateRequest.model_validate(
+            {
+                "name": "empty_scope_generate",
+                "seed": 23,
+                "row_count": 6,
+                "entity_pools": [
+                    {
+                        "name": "customers",
+                        "count": 2,
+                        "id_prefix": "customer",
+                        "attributes": [
+                            {
+                                "name": "segment",
+                                "generator": {
+                                    "kind": "categorical",
+                                    "values": ["standard"],
+                                },
+                            }
+                        ],
+                    }
+                ],
+                "fields": [
+                    {
+                        "name": "customer_id",
+                        "generator": {
+                            "kind": "entity_id",
+                            "entity_name": "customers",
+                        },
+                    },
+                    {
+                        "name": "segment",
+                        "generator": {
+                            "kind": "entity_attribute",
+                            "entity_name": "customers",
+                            "attribute": "segment",
+                        },
+                    },
+                    {
+                        "name": "amount",
+                        "generator": {
+                            "kind": "distribution",
+                            "distribution": "normal",
+                            "parameters": {"mean": 10.0, "stddev": 0.0},
+                        },
+                    },
+                ],
+                "mutations": [
+                    {
+                        "mutation_id": "premium_spike",
+                        "field": "amount",
+                        "scope": [{"field": "segment", "equals": "premium"}],
+                        "selection": {
+                            "kind": "count",
+                            "count": 1,
+                        },
+                        "mutation": {
+                            "kind": "scale",
+                            "factor": 2.0,
+                        },
+                    }
+                ],
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "Try changing the seed"):
             generate_scenario(request)
 
     def test_sample_scenario_supports_sample_compatible_mutations(self):
@@ -709,7 +777,7 @@ class ScenarioEngineTest(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "count selection requires count <= eligible_row_count"):
+        with self.assertRaisesRegex(ValueError, "eligible_row_count=1"):
             sample_scenario(request)
 
     def test_sample_scenario_rejects_stateful_selectors(self):

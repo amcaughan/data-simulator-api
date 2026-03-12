@@ -151,6 +151,7 @@ def apply_mutations(
             scenario_seed,
             "mutation",
             row_mutation.mutation_id,
+            row_mutation.field,
         )
 
         for index in indexes:
