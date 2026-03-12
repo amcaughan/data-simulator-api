@@ -11,11 +11,12 @@ from app.api.models import (
     DistributionGenerateRequest,
     DistributionSampleRequest,
     PresetGenerateRequest,
+    PresetSampleRequest,
     ScenarioGenerateRequest,
     ScenarioSampleRequest,
 )
 from app.engine.distributions import build_distribution_generate_response, build_distribution_sample_response
-from app.engine.presets import build_preset_generate_request, list_presets
+from app.engine.presets import build_preset_generate_request, build_preset_sample_request, list_presets
 from app.engine.scenario import generate_scenario, sample_scenario
 
 
@@ -26,6 +27,7 @@ SUPPORTED_ROUTES = [
     "/v1/scenarios/sample",
     "/v1/scenarios/generate",
     "/v1/presets",
+    "/v1/presets/{preset_id}/sample",
     "/v1/presets/{preset_id}/generate",
 ]
 
@@ -36,6 +38,7 @@ ROUTE_METHODS = {
     "/v1/scenarios/sample": "POST",
     "/v1/scenarios/generate": "POST",
     "/v1/presets": "GET",
+    "/v1/presets/{preset_id}/sample": "POST",
     "/v1/presets/{preset_id}/generate": "POST",
 }
 
@@ -80,7 +83,7 @@ def _extract_preset_id(route: str, event: dict[str, Any]) -> str | None:
         return path_parameters["preset_id"]
 
     parts = [part for part in route.split("/") if part]
-    if len(parts) == 4 and parts[0] == "v1" and parts[1] == "presets" and parts[3] == "generate":
+    if len(parts) == 4 and parts[0] == "v1" and parts[1] == "presets" and parts[3] in {"generate", "sample"}:
         return parts[2]
 
     return None
@@ -92,6 +95,9 @@ def _expected_method_for_route(route: str) -> str | None:
 
     if route.startswith("/v1/presets/") and route.endswith("/generate"):
         return ROUTE_METHODS["/v1/presets/{preset_id}/generate"]
+
+    if route.startswith("/v1/presets/") and route.endswith("/sample"):
+        return ROUTE_METHODS["/v1/presets/{preset_id}/sample"]
 
     return None
 
@@ -165,10 +171,21 @@ def handle_request(event: dict[str, Any]) -> dict[str, Any]:
             return json_response(200, {"presets": list_presets()})
 
         preset_id = _extract_preset_id(route, event)
-        if preset_id:
+        if preset_id and route.endswith("/sample"):
+            request = PresetSampleRequest.model_validate(payload)
+            scenario_request = build_preset_sample_request(preset_id, request)
+            return json_response(200, sample_scenario(scenario_request))
+
+        if preset_id and route.endswith("/generate"):
             request = PresetGenerateRequest.model_validate(payload)
             scenario_request = build_preset_generate_request(preset_id, request)
             return json_response(200, generate_scenario(scenario_request))
+
+        if route.startswith("/v1/presets/") and route.endswith("/sample"):
+            raise ValueError(
+                "preset sample requires a preset_id in the route, for example "
+                "'/v1/presets/transaction_benchmark/sample'"
+            )
 
         if route.startswith("/v1/presets/") and route.endswith("/generate"):
             raise ValueError(

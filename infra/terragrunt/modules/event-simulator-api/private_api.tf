@@ -114,6 +114,12 @@ resource "aws_api_gateway_resource" "preset_generate" {
   path_part   = "generate"
 }
 
+resource "aws_api_gateway_resource" "preset_sample" {
+  rest_api_id = aws_api_gateway_rest_api.private.id
+  parent_id   = aws_api_gateway_resource.preset_id.id
+  path_part   = "sample"
+}
+
 locals {
   private_api_routes = {
     health_get = {
@@ -148,6 +154,13 @@ locals {
     }
     preset_generate_post = {
       resource_id = aws_api_gateway_resource.preset_generate.id
+      http_method = "POST"
+      request_parameters = {
+        "method.request.path.preset_id" = true
+      }
+    }
+    preset_sample_post = {
+      resource_id = aws_api_gateway_resource.preset_sample.id
       http_method = "POST"
       request_parameters = {
         "method.request.path.preset_id" = true
@@ -189,6 +202,7 @@ resource "aws_api_gateway_deployment" "private" {
         health                = aws_api_gateway_resource.health.id
         preset_generate       = aws_api_gateway_resource.preset_generate.id
         preset_id             = aws_api_gateway_resource.preset_id.id
+        preset_sample         = aws_api_gateway_resource.preset_sample.id
         presets               = aws_api_gateway_resource.presets.id
         scenario_generate     = aws_api_gateway_resource.scenario_generate.id
         scenario_sample       = aws_api_gateway_resource.scenario_sample.id

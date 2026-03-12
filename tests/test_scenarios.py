@@ -7,9 +7,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from app.api.models import PresetGenerateRequest, ScenarioGenerateRequest, ScenarioSampleRequest
+from app.api.models import PresetGenerateRequest, PresetSampleRequest, ScenarioGenerateRequest, ScenarioSampleRequest
 from app.api.router import handle_request
-from app.engine.presets import build_preset_generate_request
+from app.engine.presets import build_preset_generate_request, build_preset_sample_request, list_presets
 from app.engine.scenario import generate_scenario, sample_scenario
 
 
@@ -1011,6 +1011,32 @@ class ScenarioEngineTest(unittest.TestCase):
             [1, 2, 3, 4, 5, 6],
         )
 
+    def test_transaction_preset_supports_sample(self):
+        request = build_preset_sample_request(
+            "transaction_benchmark",
+            PresetSampleRequest(seed=17, overrides={}),
+        )
+
+        payload = sample_scenario(request)
+
+        self.assertEqual(payload["scenario_name"], "transaction_benchmark")
+        self.assertIn("row", payload)
+        self.assertIn("card_id", payload["row"])
+        self.assertIn("merchant_id", payload["row"])
+
+    def test_batch_delivery_preset_rejects_sample(self):
+        with self.assertRaisesRegex(ValueError, "does not support /sample"):
+            build_preset_sample_request(
+                "batch_delivery_benchmark",
+                PresetSampleRequest(seed=17, overrides={}),
+            )
+
+    def test_list_presets_exposes_sample_support(self):
+        presets = {preset["preset_id"]: preset for preset in list_presets()}
+
+        self.assertFalse(presets["batch_delivery_benchmark"]["supports_sample"])
+        self.assertTrue(presets["transaction_benchmark"]["supports_sample"])
+
     def test_handler_routes_scenario_generate(self):
         event = {
             "action": "/v1/scenarios/generate",
@@ -1196,6 +1222,42 @@ class ScenarioEngineTest(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(payload["scenario_name"], "iot_sensor_benchmark")
         self.assertEqual(len(payload["rows"]), 8)
+
+    def test_handler_routes_preset_sample(self):
+        event = {
+            "rawPath": "/v1/presets/transaction_benchmark/sample",
+            "httpMethod": "POST",
+            "body": json.dumps(
+                {
+                    "seed": 5,
+                }
+            ),
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(payload["scenario_name"], "transaction_benchmark")
+        self.assertIn("row", payload)
+
+    def test_handler_rejects_unsupported_preset_sample(self):
+        event = {
+            "rawPath": "/v1/presets/batch_delivery_benchmark/sample",
+            "httpMethod": "POST",
+            "body": json.dumps(
+                {
+                    "seed": 5,
+                }
+            ),
+        }
+
+        response = handle_request(event)
+        payload = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(payload["error"], "bad_request")
+        self.assertIn("does not support /sample", payload["message"])
 
     def test_handler_routes_presets_list_over_http(self):
         event = {

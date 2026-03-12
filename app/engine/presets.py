@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from app.api.models import PresetGenerateRequest, ScenarioGenerateRequest
+from dataclasses import dataclass
+
+from app.api.models import PresetGenerateRequest, PresetSampleRequest, ScenarioGenerateRequest, ScenarioSampleRequest
 
 
 def _default_entity_count(row_count: int, ratio: int, minimum: int, maximum: int) -> int:
@@ -12,32 +14,16 @@ def _prefixed_values(prefix: str, count: int) -> list[str]:
     return [f"{prefix}_{index:03d}" for index in range(1, count + 1)]
 
 
-def list_presets() -> list[dict[str, str]]:
-    return [
-        {
-            "preset_id": "batch_delivery_benchmark",
-            "title": "Batch Delivery Benchmark",
-            "description": "Synthetic batch-delivered records with source-system and facility dimensions.",
-        },
-        {
-            "preset_id": "transaction_benchmark",
-            "title": "Transaction Benchmark",
-            "description": "Synthetic card-like transactions with card and merchant dimensions.",
-        },
-        {
-            "preset_id": "iot_sensor_benchmark",
-            "title": "IoT Sensor Benchmark",
-            "description": "Synthetic sensor telemetry with device and site dimensions.",
-        },
-        {
-            "preset_id": "order_benchmark",
-            "title": "Order Benchmark",
-            "description": "Synthetic order events with customer and product dimensions.",
-        },
-    ]
-
-
 PresetBuilder = Callable[[PresetGenerateRequest], ScenarioGenerateRequest]
+
+
+@dataclass(frozen=True)
+class PresetDefinition:
+    preset_id: str
+    title: str
+    description: str
+    generate_builder: PresetBuilder
+    supports_sample: bool = True
 
 
 def _build_transaction_preset(request: PresetGenerateRequest) -> ScenarioGenerateRequest:
@@ -1012,15 +998,90 @@ def _build_order_preset(request: PresetGenerateRequest) -> ScenarioGenerateReque
     )
 
 
-def build_preset_generate_request(preset_id: str, request: PresetGenerateRequest) -> ScenarioGenerateRequest:
-    builders: dict[str, PresetBuilder] = {
-        "batch_delivery_benchmark": _build_batch_delivery_preset,
-        "iot_sensor_benchmark": _build_iot_sensor_preset,
-        "order_benchmark": _build_order_preset,
-        "transaction_benchmark": _build_transaction_preset,
-    }
+def _preset_definitions() -> dict[str, PresetDefinition]:
+    definitions = [
+        PresetDefinition(
+            preset_id="batch_delivery_benchmark",
+            title="Batch Delivery Benchmark",
+            description="Synthetic batch-delivered records with source-system and facility dimensions.",
+            generate_builder=_build_batch_delivery_preset,
+            supports_sample=False,
+        ),
+        PresetDefinition(
+            preset_id="transaction_benchmark",
+            title="Transaction Benchmark",
+            description="Synthetic card-like transactions with card and merchant dimensions.",
+            generate_builder=_build_transaction_preset,
+        ),
+        PresetDefinition(
+            preset_id="iot_sensor_benchmark",
+            title="IoT Sensor Benchmark",
+            description="Synthetic sensor telemetry with device and site dimensions.",
+            generate_builder=_build_iot_sensor_preset,
+        ),
+        PresetDefinition(
+            preset_id="order_benchmark",
+            title="Order Benchmark",
+            description="Synthetic order events with customer and product dimensions.",
+            generate_builder=_build_order_preset,
+        ),
+    ]
 
-    if preset_id not in builders:
+    return {definition.preset_id: definition for definition in definitions}
+
+
+def list_presets() -> list[dict[str, str | bool]]:
+    return [
+        {
+            "preset_id": definition.preset_id,
+            "title": definition.title,
+            "description": definition.description,
+            "supports_sample": definition.supports_sample,
+        }
+        for definition in _preset_definitions().values()
+    ]
+
+
+def build_preset_generate_request(preset_id: str, request: PresetGenerateRequest) -> ScenarioGenerateRequest:
+    definitions = _preset_definitions()
+
+    if preset_id not in definitions:
         raise ValueError(f"unsupported preset: {preset_id}")
 
-    return builders[preset_id](request)
+    return definitions[preset_id].generate_builder(request)
+
+
+def build_preset_sample_request(preset_id: str, request: PresetSampleRequest) -> ScenarioSampleRequest:
+    definitions = _preset_definitions()
+
+    if preset_id not in definitions:
+        raise ValueError(f"unsupported preset: {preset_id}")
+
+    definition = definitions[preset_id]
+    if not definition.supports_sample:
+        raise ValueError(
+            f"preset {preset_id!r} is batch-oriented and does not support /sample; "
+            "use /generate to model a delivered file"
+        )
+
+    generated_request = definition.generate_builder(
+        PresetGenerateRequest(
+            seed=request.seed,
+            row_count=1,
+            overrides=request.overrides,
+        )
+    )
+    sample_payload = generated_request.model_dump()
+    sample_payload.pop("row_count", None)
+    sample_payload["process_modifiers"] = [
+        modifier
+        for modifier in sample_payload["process_modifiers"]
+        if modifier["selection"]["kind"] in {"count", "rate"}
+    ]
+    sample_payload["mutations"] = [
+        mutation
+        for mutation in sample_payload["mutations"]
+        if mutation["selection"]["kind"] in {"count", "rate"}
+    ]
+
+    return ScenarioSampleRequest.model_validate(sample_payload)
